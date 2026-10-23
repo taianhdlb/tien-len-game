@@ -45,7 +45,7 @@ export default function MonopolyGame() {
     if (!lobbyName.trim()) return alert("Nhập tên đi dũng sĩ!");
     
     // SỬA Ở ĐÂY: Khớp với sự kiện monopoly_join_room của Backend
-    socket.emit('monopoly_join_room', { 
+    socket.emit('monopoly_join', { 
       roomId: 'DND_MAIN', 
       playerName: lobbyName, 
       classId: lobbyClass 
