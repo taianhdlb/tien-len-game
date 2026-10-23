@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import { BOARD_TILES, CLASSES, EVENTS } from '../data/monopolyData';
-import { Pawn3D, Dice3D } from '../components/Monopoly/Models3D';
+import { PawnSVG, Dice3D } from '../components/Monopoly/Models3D';
 import RPGModal from '../components/Monopoly/RPGModal';
 
-// Đảm bảo URL này là của Render
 const BACKEND_URL = "https://tien-len-backend.onrender.com"; 
 const socket = io(BACKEND_URL);
 
@@ -19,6 +18,7 @@ const getPosPercent = (pos) => {
 export default function MonopolyGame() {
   const [isJoined, setIsJoined] = useState(false);
   const [lobbyName, setLobbyName] = useState('');
+  const [lobbyRoomId, setLobbyRoomId] = useState('DND_1'); // Thêm State Mã Phòng
   const [lobbyClass, setLobbyClass] = useState('fighter');
   
   const [room, setRoom] = useState(null);
@@ -26,14 +26,11 @@ export default function MonopolyGame() {
   const [isRolling, setIsRolling] = useState(false);
 
   useEffect(() => {
-    // Đã sửa chuẩn tên lệnh 'monopoly_updated' khớp với Backend
     socket.on('monopoly_updated', (data) => {
       setRoom(data);
       setIsJoined(true);
     });
-    
     socket.on('error_msg', (msg) => alert(msg));
-    
     return () => {
       socket.off('monopoly_updated');
       socket.off('error_msg');
@@ -43,12 +40,20 @@ export default function MonopolyGame() {
   const handleJoin = (e) => {
     e.preventDefault();
     if (!lobbyName.trim()) return alert("Nhập tên đi dũng sĩ!");
+    if (!lobbyRoomId.trim()) return alert("Nhập mã phòng!");
     
-    // Gửi đúng lệnh 'monopoly_join'
     socket.emit('monopoly_join', { 
-      roomId: 'DND_MAIN', 
+      roomId: lobbyRoomId, 
       playerName: lobbyName, 
       classId: lobbyClass 
+    });
+  };
+
+  const handleStartGame = () => {
+    if (room.players[0].id !== socket.id) return alert("Chỉ chủ phòng (người vào đầu tiên) mới có thể bắt đầu!");
+    socket.emit('monopoly_action', { 
+      roomId: room.id, 
+      roomState: { ...room, status: 'PLAYING' } 
     });
   };
 
@@ -60,16 +65,28 @@ export default function MonopolyGame() {
       <div className="flex h-full w-full items-center justify-center bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-stone-800 to-black p-4 text-white">
         <form onSubmit={handleJoin} className="bg-stone-900 border-2 border-amber-900 p-6 md:p-8 rounded-xl shadow-2xl w-full max-w-md relative z-10">
           <h1 className="text-2xl md:text-3xl font-bold text-amber-500 text-center mb-6 drop-shadow-md">Tạo Nhân Vật D&D</h1>
-          <div className="mb-4">
-            <label className="text-stone-300 font-bold mb-2 block text-sm">Tên hiển thị:</label>
-            <input 
-              type="text" value={lobbyName} onChange={e => setLobbyName(e.target.value)}
-              className="w-full bg-stone-950 border border-stone-700 text-white px-4 py-3 rounded-lg focus:outline-none focus:border-amber-500"
-              placeholder="Ví dụ: Tài Anh..."
-            />
+          
+          <div className="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label className="text-stone-300 font-bold mb-2 block text-sm">Tên hiển thị:</label>
+              <input 
+                type="text" value={lobbyName} onChange={e => setLobbyName(e.target.value)}
+                className="w-full bg-stone-950 border border-stone-700 text-white px-4 py-2 rounded focus:outline-none focus:border-amber-500"
+                placeholder="Tài Anh..."
+              />
+            </div>
+            <div>
+              <label className="text-stone-300 font-bold mb-2 block text-sm">Mã Phòng:</label>
+              <input 
+                type="text" value={lobbyRoomId} onChange={e => setLobbyRoomId(e.target.value.toUpperCase())}
+                className="w-full bg-stone-950 border border-stone-700 text-amber-400 font-bold px-4 py-2 rounded focus:outline-none focus:border-amber-500"
+                placeholder="DND_1"
+              />
+            </div>
           </div>
+
           <div className="mb-8">
-            <label className="text-stone-300 font-bold mb-2 block text-sm">Chọn Class (Model 3D):</label>
+            <label className="text-stone-300 font-bold mb-2 block text-sm">Chọn Class:</label>
             <div className="grid grid-cols-4 gap-2">
               {CLASSES.map(c => (
                 <div 
@@ -82,7 +99,7 @@ export default function MonopolyGame() {
               ))}
             </div>
           </div>
-          <button type="submit" className="w-full bg-amber-700 hover:bg-amber-600 text-white font-bold py-3.5 rounded-lg text-lg shadow-[0_0_15px_rgba(180,83,9,0.5)] transition">
+          <button type="submit" className="w-full bg-amber-700 hover:bg-amber-600 text-white font-bold py-3 rounded-lg text-lg shadow-[0_0_15px_rgba(180,83,9,0.5)] transition">
             Tham Gia Vương Quốc
           </button>
         </form>
@@ -91,7 +108,7 @@ export default function MonopolyGame() {
   }
 
   // ----------------------------------------------------
-  // 2. MÀN HÌNH BÀN CỜ 3D
+  // 2. MÀN HÌNH BÀN CỜ
   // ----------------------------------------------------
   const me = room.players.find(p => p.id === socket.id);
   const isMyTurn = room.players[room.currentTurn]?.id === socket.id;
@@ -110,7 +127,7 @@ export default function MonopolyGame() {
       
       socket.emit('monopoly_action', { 
         roomId: room.id, 
-        roomState: { ...room, players: newPlayers } 
+        roomState: { ...room, players: newPlayers, logs: [...room.logs, `${me.name} tung xúc xắc được ${move} điểm, tiến đến ${BOARD_TILES[newPos].name}`] } 
       });
       handleLanding(newPos);
     }, 1500);
@@ -151,7 +168,8 @@ export default function MonopolyGame() {
     <div className="flex w-full h-full bg-black font-sans text-white">
       <div className="flex-1 flex items-center justify-center bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-stone-800 to-black p-2 md:p-4 relative h-full">
         
-      <div className="relative w-full max-w-[800px] max-h-[85vh] aspect-square bg-stone-900 border-[8px] md:border-[12px] border-double border-amber-900 shadow-[0_0_40px_rgba(0,0,0,0.8)] rounded-sm overflow-hidden my-auto mx-auto">          
+        <div className="relative w-full max-w-[800px] max-h-[85vh] aspect-square bg-stone-900 border-[8px] md:border-[12px] border-double border-amber-900 shadow-[0_0_40px_rgba(0,0,0,0.8)] rounded-sm overflow-hidden my-auto mx-auto">
+          
           {BOARD_TILES.map((tile, i) => (
             <div key={i} style={getPosPercent(i)} className={`absolute w-[9.09%] h-[9.09%] border border-stone-800 flex flex-col items-center justify-center ${tile.bg}`}>
               <span className="text-lg md:text-3xl drop-shadow-lg">{tile.icon}</span>
@@ -164,25 +182,45 @@ export default function MonopolyGame() {
             const classData = CLASSES.find(c => c.id === p.classId);
             return (
               <div key={p.id} style={{ ...posCss, transition: 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)' }} className="absolute w-[9.09%] h-[9.09%] flex items-center justify-center z-20 pointer-events-none">
-                <Pawn3D hexColor={classData?.hex || '#b91c1c'} size={45} />
+                <PawnSVG hexColor={classData?.hex || 0xb91c1c} size={45} />
               </div>
             );
           })}
 
           <div className="absolute inset-[16%] bg-stone-950/85 rounded-xl border border-amber-900/60 flex flex-col items-center justify-center backdrop-blur-md p-4 shadow-inner">
-             <div className="flex gap-4 md:gap-8 mb-6">
-                <Dice3D type="D6" isRolling={isRolling} />
-                <Dice3D type="D20" isRolling={isRolling} />
-             </div>
-             
-             {isMyTurn ? (
-               <button onClick={handleRoll} disabled={isRolling} className="bg-amber-700 hover:bg-amber-600 text-stone-100 border-2 border-amber-400 font-bold py-3 px-6 md:px-10 rounded shadow-[0_0_15px_rgba(217,119,6,0.5)] transition text-base md:text-xl z-50 cursor-pointer">
-                 {isRolling ? 'Đang tung...' : 'Tung Xúc Xắc Di Chuyển'}
-               </button>
-             ) : (
-               <div className="text-amber-500 font-serif text-base md:text-xl animate-pulse text-center">
-                 Đang chờ <strong>{room.players[room.currentTurn]?.name}</strong> thao tác...
+             {room.status === 'WAITING' ? (
+               // SẢNH CHỜ
+               <div className="text-center">
+                 <h2 className="text-3xl font-bold text-amber-500 mb-2">Đang tập hợp Tổ Đội...</h2>
+                 <p className="text-stone-300 text-lg mb-6">Mã phòng: <span className="font-mono text-2xl text-white bg-stone-800 px-3 py-1 rounded border border-stone-600">{room.id}</span></p>
+                 <p className="text-stone-400 mb-8">Hãy gửi mã phòng này cho bạn bè để cùng tham gia ({room.players.length}/4)</p>
+                 
+                 {room.players.length >= 2 ? (
+                   <button onClick={handleStartGame} className="bg-emerald-700 hover:bg-emerald-600 text-white border-2 border-emerald-400 font-bold py-3 px-10 rounded shadow-[0_0_15px_rgba(4,120,87,0.6)] transition text-xl">
+                     Bắt Đầu Hành Trình
+                   </button>
+                 ) : (
+                   <div className="text-stone-500 italic animate-pulse">Cần ít nhất 2 người để bắt đầu...</div>
+                 )}
                </div>
+             ) : (
+               // TRONG TRẬN ĐẤU
+               <>
+                 <div className="flex gap-8 md:gap-12 mb-8">
+                    <Dice3D type="D6" isRolling={isRolling} result={6} />
+                    <Dice3D type="D20" isRolling={isRolling} result={20} />
+                 </div>
+                 
+                 {isMyTurn ? (
+                   <button onClick={handleRoll} disabled={isRolling} className="bg-amber-700 hover:bg-amber-600 text-stone-100 border-2 border-amber-400 font-bold py-3 px-6 md:px-10 rounded shadow-[0_0_15px_rgba(217,119,6,0.5)] transition text-base md:text-xl z-50 cursor-pointer">
+                     {isRolling ? 'Vận Mệnh Đang Xoay...' : 'Tung Xúc Xắc Di Chuyển'}
+                   </button>
+                 ) : (
+                   <div className="text-amber-500 font-serif text-base md:text-xl animate-pulse text-center">
+                     Đang chờ <strong>{room.players[room.currentTurn]?.name}</strong> thao tác...
+                   </div>
+                 )}
+               </>
              )}
           </div>
           
@@ -194,7 +232,7 @@ export default function MonopolyGame() {
         <div className="p-5 bg-stone-900 border-b border-amber-900/50">
           <h2 className="text-amber-500 font-bold uppercase tracking-widest text-sm mb-4">Tổ Đội (Party)</h2>
           {room.players.map((p, i) => (
-            <div key={p.id} className={`p-3 mb-3 rounded-lg border ${room.currentTurn === i ? 'bg-amber-900/30 border-amber-600 shadow-[0_0_10px_rgba(217,119,6,0.3)]' : 'bg-stone-800 border-stone-700'} flex justify-between items-center transition-all`}>
+            <div key={p.id} className={`p-3 mb-3 rounded-lg border ${room.currentTurn === i && room.status !== 'WAITING' ? 'bg-amber-900/30 border-amber-600 shadow-[0_0_10px_rgba(217,119,6,0.3)]' : 'bg-stone-800 border-stone-700'} flex justify-between items-center transition-all`}>
               <div className="flex items-center gap-3">
                 <span className="text-2xl">{CLASSES.find(c=>c.id===p.classId)?.icon}</span>
                 <span className="text-stone-200 font-bold">{p.name}</span>
