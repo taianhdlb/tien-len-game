@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import MonopolyGame from './games/MonopolyGame';
-import TienLenGame from './games/TienLenGame'; // Đảm bảo file này tồn tại từ mã Tiến Lên cũ
+import TienLenGame from './games/TienLenGame';
 
 export default function App() {
   const [game, setGame] = useState('MONOPOLY');
 
   return (
-    <div className="h-screen flex flex-col bg-black overflow-hidden font-sans">
-      {/* Thanh Menu điều hướng */}
+    // Sửa ở đây: Dùng min-h-screen và bỏ overflow-hidden để có thể cuộn trang
+    <div className="min-h-screen flex flex-col bg-black overflow-x-hidden font-sans">
       <div className="bg-stone-950 border-b-2 border-amber-900/60 p-3 flex gap-4 z-50 relative shadow-md">
         <button 
           onClick={() => setGame('MONOPOLY')} 
@@ -23,7 +23,6 @@ export default function App() {
         </button>
       </div>
       
-      {/* Hiển thị Game */}
       <div className="flex-1 relative w-full h-full">
         {game === 'MONOPOLY' ? <MonopolyGame /> : <TienLenGame />}
       </div>

@@ -151,8 +151,7 @@ export default function MonopolyGame() {
     <div className="flex w-full h-full bg-black font-sans text-white">
       <div className="flex-1 flex items-center justify-center bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-stone-800 to-black p-2 md:p-4 relative h-full">
         
-        <div className="relative w-[95vmin] max-w-[800px] aspect-square bg-stone-900 border-[8px] md:border-[12px] border-double border-amber-900 shadow-[0_0_40px_rgba(0,0,0,0.8)] rounded-sm overflow-hidden">
-          
+      <div className="relative w-full max-w-[800px] max-h-[85vh] aspect-square bg-stone-900 border-[8px] md:border-[12px] border-double border-amber-900 shadow-[0_0_40px_rgba(0,0,0,0.8)] rounded-sm overflow-hidden my-auto mx-auto">          
           {BOARD_TILES.map((tile, i) => (
             <div key={i} style={getPosPercent(i)} className={`absolute w-[9.09%] h-[9.09%] border border-stone-800 flex flex-col items-center justify-center ${tile.bg}`}>
               <span className="text-lg md:text-3xl drop-shadow-lg">{tile.icon}</span>
