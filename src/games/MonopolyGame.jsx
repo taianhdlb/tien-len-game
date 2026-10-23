@@ -4,10 +4,10 @@ import { BOARD_TILES, CLASSES, EVENTS } from '../data/monopolyData';
 import { Pawn3D, Dice3D } from '../components/Monopoly/Models3D';
 import RPGModal from '../components/Monopoly/RPGModal';
 
-const BACKEND_URL = "https://tien-len-backend.onrender.com";
+// Đảm bảo URL này là của Render
+const BACKEND_URL = "https://tien-len-backend.onrender.com"; 
 const socket = io(BACKEND_URL);
 
-// Hàm tính tọa độ % để quân cờ di chuyển mượt mà trên khung viền
 const getPosPercent = (pos) => {
   const step = 9.09; 
   if (pos <= 10) return { bottom: 0, right: `${pos * step}%` };
@@ -26,8 +26,8 @@ export default function MonopolyGame() {
   const [isRolling, setIsRolling] = useState(false);
 
   useEffect(() => {
-    // SỬA Ở ĐÂY: Khớp với sự kiện monopoly_room_updated của Backend
-    socket.on('monopoly_room_updated', (data) => {
+    // Đã sửa chuẩn tên lệnh 'monopoly_updated' khớp với Backend
+    socket.on('monopoly_updated', (data) => {
       setRoom(data);
       setIsJoined(true);
     });
@@ -35,7 +35,7 @@ export default function MonopolyGame() {
     socket.on('error_msg', (msg) => alert(msg));
     
     return () => {
-      socket.off('monopoly_room_updated');
+      socket.off('monopoly_updated');
       socket.off('error_msg');
     };
   }, []);
@@ -44,7 +44,7 @@ export default function MonopolyGame() {
     e.preventDefault();
     if (!lobbyName.trim()) return alert("Nhập tên đi dũng sĩ!");
     
-    // SỬA Ở ĐÂY: Khớp với sự kiện monopoly_join_room của Backend
+    // Gửi đúng lệnh 'monopoly_join'
     socket.emit('monopoly_join', { 
       roomId: 'DND_MAIN', 
       playerName: lobbyName, 
@@ -53,7 +53,7 @@ export default function MonopolyGame() {
   };
 
   // ----------------------------------------------------
-  // 1. MÀN HÌNH LOBBY (Sẽ hiển thị ngay lập tức)
+  // 1. MÀN HÌNH LOBBY CHỜ
   // ----------------------------------------------------
   if (!isJoined || !room) {
     return (
@@ -91,7 +91,7 @@ export default function MonopolyGame() {
   }
 
   // ----------------------------------------------------
-  // 2. MÀN HÌNH CHƠI GAME CHÍNH (Sau khi đã join)
+  // 2. MÀN HÌNH BÀN CỜ 3D
   // ----------------------------------------------------
   const me = room.players.find(p => p.id === socket.id);
   const isMyTurn = room.players[room.currentTurn]?.id === socket.id;
@@ -108,10 +108,9 @@ export default function MonopolyGame() {
       const newPlayers = [...room.players];
       newPlayers[room.currentTurn].position = newPos;
       
-      // SỬA Ở ĐÂY: Truyền biến updatedRoomState cho khớp Backend
       socket.emit('monopoly_action', { 
         roomId: room.id, 
-        updatedRoomState: { ...room, players: newPlayers } 
+        roomState: { ...room, players: newPlayers } 
       });
       handleLanding(newPos);
     }, 1500);
@@ -130,9 +129,9 @@ export default function MonopolyGame() {
       });
     } else if (tile.type === 'EVENT') {
       setModal({
-        title: EVENTS[0].title, icon: '📜', content: EVENTS[0].desc,
+        title: EVENTS[0]?.title || "Sự kiện", icon: '📜', content: EVENTS[0]?.desc || "Có điều gì đó xảy ra...",
         actions: [
-          { label: `Trả ${EVENTS[0].safeCost}g an toàn`, onClick: () => { setModal(null); nextTurn(); } },
+          { label: `Trả ${EVENTS[0]?.safeCost || 50}g an toàn`, onClick: () => { setModal(null); nextTurn(); } },
           { label: 'Tung D20 thử vận may', primary: true, onClick: () => { setModal(null); nextTurn(); } }
         ]
       });
@@ -144,13 +143,14 @@ export default function MonopolyGame() {
   const nextTurn = () => {
     socket.emit('monopoly_action', { 
       roomId: room.id, 
-      updatedRoomState: { ...room, currentTurn: (room.currentTurn + 1) % room.players.length } 
+      roomState: { ...room, currentTurn: (room.currentTurn + 1) % room.players.length } 
     });
   };
 
   return (
     <div className="flex w-full h-full bg-black font-sans text-white">
       <div className="flex-1 flex items-center justify-center bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-stone-800 to-black p-2 md:p-4 relative h-full">
+        
         <div className="relative w-[95vmin] max-w-[800px] aspect-square bg-stone-900 border-[8px] md:border-[12px] border-double border-amber-900 shadow-[0_0_40px_rgba(0,0,0,0.8)] rounded-sm overflow-hidden">
           
           {BOARD_TILES.map((tile, i) => (
@@ -165,7 +165,7 @@ export default function MonopolyGame() {
             const classData = CLASSES.find(c => c.id === p.classId);
             return (
               <div key={p.id} style={{ ...posCss, transition: 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)' }} className="absolute w-[9.09%] h-[9.09%] flex items-center justify-center z-20 pointer-events-none">
-                <Pawn3D hexColor={classData?.hex || 0xb91c1c} size={45} />
+                <Pawn3D hexColor={classData?.hex || '#b91c1c'} size={45} />
               </div>
             );
           })}
@@ -177,12 +177,12 @@ export default function MonopolyGame() {
              </div>
              
              {isMyTurn ? (
-               <button onClick={handleRoll} disabled={isRolling} className="bg-amber-700 hover:bg-amber-600 text-stone-100 border-2 border-amber-400 font-bold py-3 px-6 md:px-10 rounded shadow-[0_0_15px_rgba(217,119,6,0.5)] transition text-base md:text-xl z-50">
+               <button onClick={handleRoll} disabled={isRolling} className="bg-amber-700 hover:bg-amber-600 text-stone-100 border-2 border-amber-400 font-bold py-3 px-6 md:px-10 rounded shadow-[0_0_15px_rgba(217,119,6,0.5)] transition text-base md:text-xl z-50 cursor-pointer">
                  {isRolling ? 'Đang tung...' : 'Tung Xúc Xắc Di Chuyển'}
                </button>
              ) : (
                <div className="text-amber-500 font-serif text-base md:text-xl animate-pulse text-center">
-                 Đang chờ <strong>{room.players[room.currentTurn]?.name}</strong> thực hiện nước đi...
+                 Đang chờ <strong>{room.players[room.currentTurn]?.name}</strong> thao tác...
                </div>
              )}
           </div>
