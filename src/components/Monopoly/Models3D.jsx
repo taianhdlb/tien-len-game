@@ -1208,54 +1208,88 @@ export function buildBuildingModel(tier = 0, colorHex = 0xb91c1c) {
   return root;
 }
 
-export function Building3D({ tier = 0, colorHex = 0xb91c1c, size = 36 }) {
-  const mountRef = useRef(null);
+const buildingSnapshotCache = new Map();
 
-  useEffect(() => {
-    const mountEl = mountRef.current;
-    if (!mountEl) return;
+function getBuildingDataUrl(tier, colorHex) {
+  const key = `${tier}_${colorHex}`;
+  if (buildingSnapshotCache.has(key)) return buildingSnapshotCache.get(key);
+  if (typeof document === 'undefined') return null;
 
-    const width = size;
-    const height = size;
+  try {
+    const width = 120;
+    const height = 120;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 50);
-    camera.position.set(0, 1.4, 2.8);
-    camera.lookAt(0, 0.5, 0);
+    const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 50);
+    camera.position.set(0, 1.35, 2.7);
+    camera.lookAt(0, 0.45, 0);
 
     const renderer = new THREE.WebGLRenderer({
+      canvas,
       alpha: true,
       antialias: true,
-      powerPreference: 'low-power'
+      preserveDrawingBuffer: true
     });
     renderer.setSize(width, height);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    renderer.setPixelRatio(2);
 
-    mountEl.innerHTML = '';
-    mountEl.appendChild(renderer.domElement);
-
-    const ambLight = new THREE.AmbientLight(0xffffff, 1.2);
+    const ambLight = new THREE.AmbientLight(0xffffff, 1.4);
     scene.add(ambLight);
 
-    const dirLight = new THREE.DirectionalLight(0xffffff, 2.2);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 2.5);
     dirLight.position.set(3, 5, 4);
     scene.add(dirLight);
+
+    const rimLight = new THREE.DirectionalLight(0x93c5fd, 1.0);
+    rimLight.position.set(-3, 3, -3);
+    scene.add(rimLight);
 
     const model = buildBuildingModel(tier, colorHex);
     model.rotation.y = Math.PI * 0.25;
     scene.add(model);
 
     renderer.render(scene, camera);
+    const dataUrl = canvas.toDataURL('image/png');
 
-    return () => {
-      disposeHierarchy(scene);
-      renderer.dispose();
-      renderer.forceContextLoss();
-      if (mountEl) mountEl.innerHTML = '';
-    };
-  }, [tier, colorHex, size]);
+    disposeHierarchy(scene);
+    renderer.dispose();
+    renderer.forceContextLoss();
 
-  return <div ref={mountRef} style={{ width: size, height: size }} className="inline-flex items-center justify-center pointer-events-none drop-shadow" />;
+    buildingSnapshotCache.set(key, dataUrl);
+    return dataUrl;
+  } catch (err) {
+    console.error('Error generating 3D building snapshot:', err);
+    return null;
+  }
+}
+
+export function Building3D({ tier = 0, colorHex = 0xb91c1c, size = 36, className = "" }) {
+  const [dataUrl, setDataUrl] = useState(() => getBuildingDataUrl(tier, colorHex));
+
+  useEffect(() => {
+    const url = getBuildingDataUrl(tier, colorHex);
+    setDataUrl(url);
+  }, [tier, colorHex]);
+
+  if (dataUrl) {
+    return (
+      <img
+        src={dataUrl}
+        alt={`Building Tier ${tier}`}
+        style={{ width: size, height: size }}
+        className={`inline-block pointer-events-none drop-shadow-[0_4px_8px_rgba(0,0,0,0.85)] object-contain select-none ${className}`}
+      />
+    );
+  }
+
+  return (
+    <div style={{ width: size, height: size }} className="inline-flex items-center justify-center">
+      <span className="text-xl">{tier === 3 ? '🏯' : tier === 2 ? '🏰' : tier === 1 ? '⛺' : '🚩'}</span>
+    </div>
+  );
 }
 
 // ============================================================================
