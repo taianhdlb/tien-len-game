@@ -1,21 +1,29 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
 import { BOARD_TILES, CLASSES, EVENTS, BLESSINGS, INSTANT_WIN_RELIC_IDS } from '../data/monopolyData';
-import { PawnSVG, Piece3D, Dice3D, TokenGalleryModal } from '../components/Monopoly/Models3D';
+import { PawnSVG, Piece3D, Dice3D, TokenGalleryModal, Building3D } from '../components/Monopoly/Models3D';
 import { FantasyIcon, BuildingBadge } from '../components/Monopoly/FantasyIcons';
 import RPGModal from '../components/Monopoly/RPGModal';
 
 const BACKEND_URL = "https://tien-len-backend.onrender.com";
 const socket = io(BACKEND_URL);
 
-// Tính toán vị trí phần trăm theo 4 cạnh bàn cờ 11x11
-const getPosPercent = (pos) => {
-  const step = 9.0909;
-  if (pos <= 10) return { bottom: 0, right: `${pos * step}%` };
-  if (pos <= 20) return { bottom: `${(pos - 10) * step}%`, left: 0 };
-  if (pos <= 30) return { top: 0, left: `${(pos - 20) * step}%` };
-  return { top: `${(pos - 30) * step}%`, right: 0 };
-};
+// Tính toán tọa độ ô cờ trong lưới CSS Grid 11x11 (Chuẩn 100% không lệch)
+export function getTileGridArea(pos) {
+  if (pos >= 0 && pos <= 10) {
+    return { row: 11, col: 11 - pos }; // Hàng dưới: từ phải (cột 11) sang trái (cột 1)
+  }
+  if (pos >= 11 && pos <= 20) {
+    return { row: 11 - (pos - 10), col: 1 }; // Cột trái: từ dưới (hàng 11) lên trên (hàng 1)
+  }
+  if (pos >= 21 && pos <= 30) {
+    return { row: 1, col: pos - 20 + 1 }; // Hàng trên: từ trái (cột 1) sang phải (cột 11)
+  }
+  if (pos >= 31 && pos <= 39) {
+    return { row: pos - 30 + 1, col: 11 }; // Cột phải: từ trên (hàng 1) xuống dưới (hàng 10)
+  }
+  return { row: 11, col: 11 };
+}
 
 export default function MonopolyGame() {
   const [isJoined, setIsJoined] = useState(false);
@@ -69,15 +77,30 @@ export default function MonopolyGame() {
   };
 
   const handleStartGame = () => {
-    if (room.players[0].id !== socket.id) return alert("Chỉ chủ phòng (người vào đầu tiên) mới có thể bắt đầu!");
+    if (room.players[0].id !== socket.id) return alert("Chỉ chủ phòng mới có thể bắt đầu!");
+    const initialProps = room.properties || {};
     socket.emit('monopoly_action', {
       roomId: room.id,
-      roomState: { ...room, status: 'PLAYING', properties: room.properties || {} }
+      roomState: { ...room, status: 'PLAYING', properties: initialProps }
     });
   };
 
   const me = room?.players?.find((p) => p.id === socket.id);
   const isMyTurn = room?.status === 'PLAYING' && room?.players[room?.currentTurn]?.id === socket.id;
+
+  // Hàm chuyển lượt an toàn: đồng bộ toàn bộ state cập nhật vào server
+  const commitRoomStateAndNextTurn = (updatedRoomState) => {
+    const nextIdx = (updatedRoomState.currentTurn + 1) % updatedRoomState.players.length;
+    const finalState = {
+      ...updatedRoomState,
+      currentTurn: nextIdx
+    };
+    setRoom(finalState);
+    socket.emit('monopoly_action', {
+      roomId: room.id,
+      roomState: finalState
+    });
+  };
 
   // ----------------------------------------------------
   // DI CHUYỂN BẰNG XÚC XẮC D6 (CHỈ ROLL D6 KHI DI CHUYỂN)
@@ -103,15 +126,15 @@ export default function MonopolyGame() {
       const playerIdx = room.currentTurn;
       newPlayers[playerIdx].position = newPos;
 
-      let logMsg = `${me.name} tung 2 xúc xắc được [${r1} + ${r2} = ${totalMove}] điểm, tiến đến ${BOARD_TILES[newPos].name}`;
+      let logMsg = `${me.name} gieo 2 xúc xắc [${r1} + ${r2} = ${totalMove}] điểm, tiến vào ${BOARD_TILES[newPos].name}`;
 
       // Thưởng 200g khi đi qua hoặc vào Khởi Hành (GO)
       if (passedGo && newPos !== 0) {
         newPlayers[playerIdx].gold += 200;
-        logMsg += ` (Đi qua Khởi Hành nhận +200g trợ cấp)`;
+        logMsg += ` (Đi qua Cổng Khởi Hành nhận +200g)`;
       } else if (newPos === 0) {
         newPlayers[playerIdx].gold += 200;
-        logMsg += ` (Vào Cổng Khởi Hành nhận +200g trợ cấp)`;
+        logMsg += ` (Vào Cổng Khởi Hành nhận +200g)`;
       }
 
       const updatedState = {
@@ -120,12 +143,13 @@ export default function MonopolyGame() {
         logs: [...(room.logs || []), logMsg]
       };
 
+      setRoom(updatedState);
       socket.emit('monopoly_action', {
         roomId: room.id,
         roomState: updatedState
       });
 
-      // Kích hoạt tương tác ô tiếp đất
+      // Tương tác ô tiếp đất
       handleLanding(newPos, updatedState);
     }, 1200);
   };
@@ -143,19 +167,19 @@ export default function MonopolyGame() {
     if (tile.type === 'PROPERTY' || tile.type === 'RELIC') {
       const isRelic = tile.type === 'RELIC';
 
-      // Trường hợp 1: Chưa ai sở hữu -> Hỏi Mua Đất
+      // Trường hợp 1: Chưa ai sở hữu -> Mua Quyền Sở Hữu
       if (!propData || !propData.ownerId) {
         const canAfford = currentPlayer.gold >= tile.price;
         setModal({
           title: tile.name,
-          speaker: isRelic ? "Thánh Vật Cổ Xưa" : "Vùng Đất Hoang Sơ",
+          speaker: isRelic ? "Thánh Vật Cổ Xưa" : "Lãnh Địa Hoang Sơ",
           iconKey: tile.iconKey,
           content: isRelic
             ? `Bạn tìm thấy Thánh Vật [${tile.name}]. Thu thập đủ 3 Thánh Vật sẽ Chiến Thắng Ngay Lập Tức! Giá sở hữu: ${tile.price} Gold.`
-            : `Vùng đất trù phú [${tile.name}] chưa có chủ quyền. Bạn có muốn chi ${tile.price} Gold để cắm cờ xác lập lãnh địa?`,
+            : `Vùng đất trù phú [${tile.name}] chưa có chủ quyền. Bạn có muốn chi ${tile.price} Gold để xác lập lãnh địa và cắm cờ chủ quyền?`,
           actions: [
             {
-              label: `Mua Quyền Sở Hữu (${tile.price}g)`,
+              label: `Mua Đất (${tile.price}g)`,
               primary: true,
               disabled: !canAfford,
               icon: '🪙',
@@ -167,28 +191,31 @@ export default function MonopolyGame() {
                   [pos]: { ownerId: currentPlayer.id, level: 0 }
                 };
 
-                // Kiểm tra điều kiện Thắng Tuyệt Đối bằng 3 Thánh Vật
                 const ownedRelics = INSTANT_WIN_RELIC_IDS.filter((rId) => newProps[rId]?.ownerId === currentPlayer.id);
-                let logs = [...currentState.logs, `${currentPlayer.name} đã mua thành công ${tile.name} với giá ${tile.price}g.`];
+                let logs = [...currentState.logs, `${currentPlayer.name} đã mua thành công ${tile.name} (${tile.price}g).`];
 
+                let nextStatus = currentState.status;
                 if (ownedRelics.length === 3) {
-                  logs.push(`👑 CHIẾN THẮNG TUYỆT ĐỐI! ${currentPlayer.name} ĐÃ THU THẬP ĐỦ 3 THÁNH VẬT CỦA VƯƠNG QUỐC!`);
-                  currentState.status = 'VICTORY';
+                  logs.push(`👑 CHIẾN THẮNG TUYỆT ĐỐI! ${currentPlayer.name} ĐÃ THU THẬP ĐỦ 3 THÁNH VẬT!`);
+                  nextStatus = 'VICTORY';
                 }
 
-                socket.emit('monopoly_action', {
-                  roomId: room.id,
-                  roomState: { ...currentState, players: newPlayers, properties: newProps, logs }
-                });
+                const finalState = {
+                  ...currentState,
+                  status: nextStatus,
+                  players: newPlayers,
+                  properties: newProps,
+                  logs
+                };
                 setModal(null);
-                nextTurn(currentState);
+                commitRoomStateAndNextTurn(finalState);
               }
             },
             {
-              label: 'Bỏ Qua Lãnh Địa',
+              label: 'Bỏ Qua',
               onClick: () => {
                 setModal(null);
-                nextTurn(currentState);
+                commitRoomStateAndNextTurn(currentState);
               }
             }
           ]
@@ -201,13 +228,13 @@ export default function MonopolyGame() {
         const owner = currentState.players.find((p) => p.id === propData.ownerId) || { name: 'Chủ Đất' };
         const tier = propData.level || 0;
         const rentAmount = tile.rents ? tile.rents[tier] : tile.rent;
-        const tierNames = ['Đất Khảo Sát', 'Trại Tiền Đồn ⛺', 'Tháp Canh Đá 🏰', 'Đại Pháo Đài 🏯'];
+        const tierNames = ['Đất Khảo Sát 🚩', 'Trại Tiền Đồn ⛺', 'Tháp Canh Đá 🏰', 'Đại Pháo Đài 🏯'];
 
         setModal({
           title: `Thu Phí Lãnh Địa: ${tile.name}`,
-          speaker: `Lính Canh Thuế (${owner.name})`,
+          speaker: `Lính Thuế (${owner.name})`,
           iconKey: 'tax',
-          content: `Vùng đất này thuộc chủ quyền của ${owner.name} (Cấp độ: ${tierNames[tier]}). Bạn phải nộp lệ phí thuê đất là ${rentAmount} Gold!`,
+          content: `Lãnh địa thuộc quyền của ${owner.name} (Kiến trúc: ${tierNames[tier]}). Bạn phải nộp lệ phí thuê đất là ${rentAmount} Gold!`,
           actions: [
             {
               label: `Nộp ${rentAmount}g và Tiếp Tục`,
@@ -222,13 +249,14 @@ export default function MonopolyGame() {
                 newPlayers[myIdx].gold -= rentAmount;
                 if (ownerIdx !== -1) newPlayers[ownerIdx].gold += rentAmount;
 
-                const logMsg = `${currentPlayer.name} trả ${rentAmount}g tiền thuê đất ${tile.name} cho ${owner.name}.`;
-                socket.emit('monopoly_action', {
-                  roomId: room.id,
-                  roomState: { ...currentState, players: newPlayers, logs: [...currentState.logs, logMsg] }
-                });
+                const logMsg = `${currentPlayer.name} trả ${rentAmount}g tiền thuê ${tile.name} cho ${owner.name}.`;
+                const finalState = {
+                  ...currentState,
+                  players: newPlayers,
+                  logs: [...currentState.logs, logMsg]
+                };
                 setModal(null);
-                nextTurn(currentState);
+                commitRoomStateAndNextTurn(finalState);
               }
             }
           ]
@@ -245,10 +273,10 @@ export default function MonopolyGame() {
 
         if (curLevel < 3) {
           setModal({
-            title: `Lãnh Thổ Của Bạn: ${tile.name}`,
+            title: `Lãnh Địa Của Bạn: ${tile.name}`,
             speaker: 'Kiến Trúc Sư Hoàng Gia',
             iconKey: 'castle',
-            content: `Bạn đang thị sát lãnh địa của mình. Nâng cấp lên [${nextLevels[curLevel]}] để tăng gấp bội tiền thuê thu từ đối thủ! Phí xây dựng: ${upgradeCost} Gold.`,
+            content: `Bạn đang thị sát lãnh địa của mình. Nâng cấp lên [${nextLevels[curLevel]}] để tăng gấp bội tiền thuê đất thu từ đối thủ! Phí nâng cấp: ${upgradeCost} Gold.`,
             actions: [
               {
                 label: `Nâng Cấp Kiến Trúc (${upgradeCost}g)`,
@@ -262,33 +290,35 @@ export default function MonopolyGame() {
                     ...properties,
                     [pos]: { ...propData, level: curLevel + 1 }
                   };
-                  const logMsg = `${currentPlayer.name} nâng cấp ${tile.name} lên ${nextLevels[curLevel]} với giá ${upgradeCost}g!`;
-                  socket.emit('monopoly_action', {
-                    roomId: room.id,
-                    roomState: { ...currentState, players: newPlayers, properties: newProps, logs: [...currentState.logs, logMsg] }
-                  });
+                  const logMsg = `${currentPlayer.name} nâng cấp ${tile.name} lên ${nextLevels[curLevel]} (${upgradeCost}g)!`;
+                  const finalState = {
+                    ...currentState,
+                    players: newPlayers,
+                    properties: newProps,
+                    logs: [...currentState.logs, logMsg]
+                  };
                   setModal(null);
-                  nextTurn(currentState);
+                  commitRoomStateAndNextTurn(finalState);
                 }
               },
               {
-                label: 'Giữ Nguyên Hiện Trạng',
+                label: 'Giữ Hiện Trạng',
                 onClick: () => {
                   setModal(null);
-                  nextTurn(currentState);
+                  commitRoomStateAndNextTurn(currentState);
                 }
               }
             ]
           });
         } else {
           // Đã đạt cấp tối đa
-          setTimeout(() => nextTurn(currentState), 800);
+          setTimeout(() => commitRoomStateAndNextTurn(currentState), 800);
         }
         return;
       }
     }
 
-    // 2. SỰ KIỆN D20 (EVENT) - THỬ THÁCH D&D KIỂM ĐỊNH DC
+    // 2. SỰ KIỆN D20 (EVENT)
     else if (tile.type === 'EVENT') {
       const ev = EVENTS[Math.floor(Math.random() * EVENTS.length)];
       setModal({
@@ -305,24 +335,23 @@ export default function MonopolyGame() {
             if (outcome === 'SUCCESS' || outcome === 'CRIT_SUCCESS') {
               if (ev.passGold) {
                 newPlayers[currentState.currentTurn].gold += ev.passGold;
-                outcomeLogs.push(`${currentPlayer.name} kiểm định D20 thắng lợi (${rolled} >= ${ev.dc}), nhận +${ev.passGold} Gold!`);
+                outcomeLogs.push(`${currentPlayer.name} kiểm định D20 thắng (${rolled} >= ${ev.dc}), nhận +${ev.passGold} Gold!`);
               }
             } else {
               if (ev.failCost) {
                 newPlayers[currentState.currentTurn].gold = Math.max(0, newPlayers[currentState.currentTurn].gold - ev.failCost);
-                outcomeLogs.push(`${currentPlayer.name} kiểm định D20 thất bại (${rolled} < ${ev.dc}), mất ${ev.failCost} Gold.`);
+                outcomeLogs.push(`${currentPlayer.name} kiểm định D20 bại (${rolled} < ${ev.dc}), mất ${ev.failCost} Gold.`);
               }
               if (ev.failJail) {
                 newPlayers[currentState.currentTurn].position = 10;
                 newPlayers[currentState.currentTurn].inJail = true;
-                outcomeLogs.push(`${currentPlayer.name} bị áp giải vào Ngục Giam tối tăm!`);
+                outcomeLogs.push(`${currentPlayer.name} bị tống giam vào Ngục!`);
               }
             }
 
-            socket.emit('monopoly_action', {
-              roomId: room.id,
-              roomState: { ...currentState, players: newPlayers, logs: outcomeLogs }
-            });
+            const finalState = { ...currentState, players: newPlayers, logs: outcomeLogs };
+            setRoom(finalState);
+            socket.emit('monopoly_action', { roomId: room.id, roomState: finalState });
           }, 1500);
         },
         actions: [
@@ -332,13 +361,17 @@ export default function MonopolyGame() {
               if (ev.safeCost > 0) {
                 const newPlayers = [...currentState.players];
                 newPlayers[currentState.currentTurn].gold = Math.max(0, newPlayers[currentState.currentTurn].gold - ev.safeCost);
-                socket.emit('monopoly_action', {
-                  roomId: room.id,
-                  roomState: { ...currentState, players: newPlayers, logs: [...currentState.logs, `${currentPlayer.name} chọn nộp ${ev.safeCost}g an toàn.`] }
-                });
+                const finalState = {
+                  ...currentState,
+                  players: newPlayers,
+                  logs: [...currentState.logs, `${currentPlayer.name} chọn nộp ${ev.safeCost}g an toàn.`]
+                };
+                setModal(null);
+                commitRoomStateAndNextTurn(finalState);
+              } else {
+                setModal(null);
+                commitRoomStateAndNextTurn(currentState);
               }
-              setModal(null);
-              nextTurn(currentState);
             }
           },
           {
@@ -346,7 +379,7 @@ export default function MonopolyGame() {
             primary: true,
             onClick: () => {
               setModal(null);
-              nextTurn(currentState);
+              commitRoomStateAndNextTurn(currentState);
             }
           }
         ]
@@ -354,7 +387,7 @@ export default function MonopolyGame() {
       return;
     }
 
-    // 3. PHƯỚC LÀNH THẦN LINH (BLESSING) - KIỂM ĐỊNH D20
+    // 3. PHƯỚC LÀNH THẦN LINH (BLESSING)
     else if (tile.type === 'BLESSING') {
       const bl = BLESSINGS[Math.floor(Math.random() * BLESSINGS.length)];
       setModal({
@@ -374,23 +407,22 @@ export default function MonopolyGame() {
             } else {
               if (bl.failCost > 0) {
                 newPlayers[currentState.currentTurn].gold = Math.max(0, newPlayers[currentState.currentTurn].gold - bl.failCost);
-                outcomeLogs.push(`${currentPlayer.name} thiếu thành tâm trước Thần ${bl.god}, bị phạt ${bl.failCost} Gold.`);
+                outcomeLogs.push(`${currentPlayer.name} thất bại trước Thần ${bl.god}, bị phạt ${bl.failCost} Gold.`);
               }
             }
 
-            socket.emit('monopoly_action', {
-              roomId: room.id,
-              roomState: { ...currentState, players: newPlayers, logs: outcomeLogs }
-            });
+            const finalState = { ...currentState, players: newPlayers, logs: outcomeLogs };
+            setRoom(finalState);
+            socket.emit('monopoly_action', { roomId: room.id, roomState: finalState });
           }, 1500);
         },
         actions: [
           {
-            label: 'Tạ Ơn Thần Linh & Tiếp Tục',
+            label: 'Tạ Ơn & Tiếp Tục',
             primary: true,
             onClick: () => {
               setModal(null);
-              nextTurn(currentState);
+              commitRoomStateAndNextTurn(currentState);
             }
           }
         ]
@@ -398,14 +430,14 @@ export default function MonopolyGame() {
       return;
     }
 
-    // 4. THUẾ HOÀNG GIA (TAX)
+    // 4. THUẾ (TAX)
     else if (tile.type === 'TAX') {
       const taxAmount = tile.price || 100;
       setModal({
         title: tile.name,
         speaker: 'Quan Thu Thuế Vương Triều',
         iconKey: 'tax',
-        content: `Chiến phí quốc gia yêu cầu mọi dũng sĩ qua đây nộp ${taxAmount} Gold vào ngân khố.`,
+        content: `Nộp ${taxAmount} Gold vào ngân khố vương quốc.`,
         actions: [
           {
             label: `Nộp ${taxAmount}g vào Ngân Khố`,
@@ -414,12 +446,13 @@ export default function MonopolyGame() {
             onClick: () => {
               const newPlayers = [...currentState.players];
               newPlayers[currentState.currentTurn].gold = Math.max(0, newPlayers[currentState.currentTurn].gold - taxAmount);
-              socket.emit('monopoly_action', {
-                roomId: room.id,
-                roomState: { ...currentState, players: newPlayers, logs: [...currentState.logs, `${currentPlayer.name} nộp ${taxAmount}g thuế.`] }
-              });
+              const finalState = {
+                ...currentState,
+                players: newPlayers,
+                logs: [...currentState.logs, `${currentPlayer.name} nộp ${taxAmount}g thuế.`]
+              };
               setModal(null);
-              nextTurn(currentState);
+              commitRoomStateAndNextTurn(finalState);
             }
           }
         ]
@@ -434,7 +467,7 @@ export default function MonopolyGame() {
         title: tile.name,
         speaker: 'Vết Rách Không Gian',
         iconKey: 'teleport',
-        content: `Một luồng ánh sáng chói lòa hút bạn qua cổng không gian bí ẩn đến ngay ô [${BOARD_TILES[targetPos].name}]!`,
+        content: `Cổng không gian huyền bí đưa bạn tức thì đến ô [${BOARD_TILES[targetPos].name}]!`,
         actions: [
           {
             label: 'Bước Qua Cổng Không Gian',
@@ -442,12 +475,13 @@ export default function MonopolyGame() {
             onClick: () => {
               const newPlayers = [...currentState.players];
               newPlayers[currentState.currentTurn].position = targetPos;
-              socket.emit('monopoly_action', {
-                roomId: room.id,
-                roomState: { ...currentState, players: newPlayers, logs: [...currentState.logs, `${currentPlayer.name} dịch chuyển không gian đến ${BOARD_TILES[targetPos].name}!`] }
-              });
+              const finalState = {
+                ...currentState,
+                players: newPlayers,
+                logs: [...currentState.logs, `${currentPlayer.name} dịch chuyển không gian đến ${BOARD_TILES[targetPos].name}!`]
+              };
               setModal(null);
-              nextTurn(currentState);
+              commitRoomStateAndNextTurn(finalState);
             }
           }
         ]
@@ -459,9 +493,9 @@ export default function MonopolyGame() {
     else if (tile.type === 'GO_TO_JAIL') {
       setModal({
         title: 'Bắt Giữ Khẩn Cấp!',
-        speaker: 'Đội Trưởng Đội Vệ Binh',
+        speaker: 'Đội Vệ Binh',
         iconKey: 'jail',
-        content: 'Bạn bị bắt quả tang vi phạm luật lệ thành phố và bị áp giải ngay lập tức vào Ngục Giam!',
+        content: 'Bạn bị bắt quả tang vi phạm luật lệ và bị áp giải ngay lập tức vào Ngục Giam!',
         actions: [
           {
             label: 'Chấp Nhận Vào Ngục',
@@ -471,12 +505,13 @@ export default function MonopolyGame() {
               const newPlayers = [...currentState.players];
               newPlayers[currentState.currentTurn].position = 10;
               newPlayers[currentState.currentTurn].inJail = true;
-              socket.emit('monopoly_action', {
-                roomId: room.id,
-                roomState: { ...currentState, players: newPlayers, logs: [...currentState.logs, `${currentPlayer.name} bị tống giam vào Ngục!`] }
-              });
+              const finalState = {
+                ...currentState,
+                players: newPlayers,
+                logs: [...currentState.logs, `${currentPlayer.name} bị tống giam vào Ngục!`]
+              };
               setModal(null);
-              nextTurn(currentState);
+              commitRoomStateAndNextTurn(finalState);
             }
           }
         ]
@@ -484,16 +519,8 @@ export default function MonopolyGame() {
       return;
     }
 
-    // Mặc định chuyển lượt sau 1 giây
-    setTimeout(() => nextTurn(currentState), 1000);
-  };
-
-  const nextTurn = (currentState) => {
-    const nextIdx = (currentState.currentTurn + 1) % currentState.players.length;
-    socket.emit('monopoly_action', {
-      roomId: room.id,
-      roomState: { ...currentState, currentTurn: nextIdx }
-    });
+    // Mặc định chuyển lượt
+    setTimeout(() => commitRoomStateAndNextTurn(currentState), 1000);
   };
 
   // ----------------------------------------------------
@@ -596,7 +623,7 @@ export default function MonopolyGame() {
     <div className="flex flex-col lg:flex-row w-full h-full bg-black font-sans text-stone-100 overflow-hidden select-none">
       
       {/* Mobile Top Navigation Tabs */}
-      <div className="lg:hidden flex bg-stone-950 border-b border-amber-900/50 p-1.5 justify-around z-30">
+      <div className="lg:hidden flex bg-stone-950 border-b border-amber-900/50 p-1.5 justify-around z-40">
         <button
           onClick={() => setActiveMobileTab('BOARD')}
           className={`px-3 py-1 text-xs font-bold rounded-lg transition ${activeMobileTab === 'BOARD' ? 'bg-amber-700 text-white' : 'text-stone-400'}`}
@@ -638,87 +665,127 @@ export default function MonopolyGame() {
           </button>
         </div>
 
-        {/* 11x11 RESPONSIVE MONOPOLY BOARD */}
-        <div className="relative w-full max-w-[min(96vw,84vh,800px)] aspect-square bg-stone-950 border-4 sm:border-8 border-double border-amber-800/80 shadow-[0_0_50px_rgba(0,0,0,0.95)] rounded-xl overflow-hidden my-auto mx-auto">
+        {/* 11x11 CHUẨN CSS GRID MONOPOLY BOARD */}
+        <div className="relative w-full max-w-[min(96vw,84vh,760px)] aspect-square bg-stone-950 border-4 sm:border-8 border-amber-900/80 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.95)] grid grid-cols-11 grid-rows-11 gap-0.5 sm:gap-1 p-0.5 sm:p-1.5 my-auto mx-auto select-none overflow-visible">
           
-          {/* 40 BOARD TILES */}
-          {BOARD_TILES.map((tile, i) => {
+          {/* 40 BOARD TILES (Tọa độ CSS Grid tự động khóa chết không lệch) */}
+          {BOARD_TILES.map((tile) => {
+            const gridPos = getTileGridArea(tile.id);
             const propState = room.properties?.[tile.id];
-            const ownerPlayer = propState ? room.players.find((p) => p.id === propState.ownerId) : null;
+            const ownerPlayer = propState?.ownerId ? room.players.find((p) => p.id === propState.ownerId) : null;
             const ownerClass = ownerPlayer ? CLASSES.find((c) => c.id === ownerPlayer.classId) : null;
+            const ownerColorHex = ownerClass ? ownerClass.hex : 0xfbbf24;
+            const ownerColorStr = `#${ownerColorHex.toString(16).padStart(6, '0')}`;
             const isRelic = INSTANT_WIN_RELIC_IDS.includes(tile.id);
+            const tierNames = ['Cờ Lãnh Địa', 'Trại Tiền Đồn', 'Tháp Canh Đá', 'Đại Pháo Đài'];
 
             return (
               <div
-                key={i}
-                style={getPosPercent(i)}
+                key={tile.id}
+                style={{ gridRow: gridPos.row, gridColumn: gridPos.col }}
                 onClick={() => setInspectedTile(tile)}
-                className={`absolute w-[9.09%] h-[9.09%] border border-stone-800/90 flex flex-col items-center justify-between p-0.5 sm:p-1 cursor-pointer transition-all hover:brightness-125 hover:z-20 ${tile.bg}`}
+                className={`relative flex flex-col justify-between items-center p-0.5 sm:p-1 rounded-sm border border-stone-800/80 cursor-pointer transition-all hover:brightness-125 hover:z-20 overflow-visible ${tile.bg}`}
               >
-                {/* Dải màu quyền sở hữu hoặc nhóm đất */}
-                {ownerPlayer ? (
+                {/* 1. TAG TÊN NGƯỜI SỞ HỮU NỔI BẬT VƯỢT LÊN TRÊN Ô CỜ */}
+                {ownerPlayer && (
                   <div
-                    className="w-full h-1 sm:h-1.5 rounded-sm"
-                    style={{ backgroundColor: ownerClass ? `#${ownerClass.hex.toString(16).padStart(6, '0')}` : '#fbbf24' }}
-                    title={`Chủ sở hữu: ${ownerPlayer.name}`}
-                  />
-                ) : (
-                  <div className="w-full h-0.5 sm:h-1 bg-stone-800/50 rounded-sm" />
+                    className="absolute -top-3 sm:-top-3.5 left-1/2 -translate-x-1/2 z-30 flex items-center gap-1 bg-stone-950 border-2 rounded-full px-1.5 py-0.2 sm:py-0.5 shadow-2xl whitespace-nowrap pointer-events-none"
+                    style={{ borderColor: ownerColorStr }}
+                    title={`Chủ sở hữu: ${ownerPlayer.name} (${tierNames[propState.level || 0]})`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: ownerColorStr }} />
+                    <span className="text-[6.5px] sm:text-[8px] font-black text-amber-200 tracking-tight">
+                      {ownerPlayer.name}
+                    </span>
+                  </div>
                 )}
 
-                {/* Icon ô cờ Fantasy chuyên nghiệp */}
-                <div className="my-auto flex items-center justify-center">
-                  <FantasyIcon name={tile.iconKey} className="w-3.5 h-3.5 sm:w-5 sm:h-5 md:w-6 md:h-6" glow={isRelic} />
-                </div>
-
-                {/* Tên ô cờ (Tự động co nhỏ, KHÔNG BAO GIỜ TRÀN CHỮ TRÊN ĐIỆN THOẠI) */}
-                <span className="text-[6px] sm:text-[7.5px] md:text-[9px] font-bold text-stone-200 truncate w-full text-center px-0.5 leading-none">
-                  {tile.shortName || tile.name}
-                </span>
-
-                {/* Huy hiệu nhà đất hoặc giá tiền */}
-                <div className="flex items-center justify-center w-full min-h-[9px]">
-                  {propState && propState.ownerId ? (
+                {/* 2. DẢI MÀU NHÓM ĐẤT HOẶC CHỦ SỞ HỮU */}
+                <div className="w-full flex items-center justify-between gap-0.5 px-0.5">
+                  <div
+                    className="h-1 sm:h-1.5 flex-1 rounded-full shadow-inner"
+                    style={{ backgroundColor: ownerPlayer ? ownerColorStr : tile.colorHex || '#475569' }}
+                  />
+                  {propState?.ownerId && (
                     <BuildingBadge
                       tier={propState.level || 0}
-                      colorHex={ownerClass ? ownerClass.hex : 0xfbbf24}
-                      className="w-3 h-3 sm:w-4 sm:h-4"
+                      colorHex={ownerColorHex}
+                      className="w-2.5 h-2.5 sm:w-3.5 sm:h-3.5 flex-shrink-0"
                     />
-                  ) : tile.price > 0 ? (
-                    <span className="text-[5.5px] sm:text-[7.5px] font-extrabold text-amber-300/90 leading-none">
+                  )}
+                </div>
+
+                {/* 3. TRUNG TÂM: MÔ HÌNH 3D KHI ĐÃ MUA / XÂY DỰNG HOẶC FANTASY ICON NẾU CHƯA CÓ CHỦ */}
+                <div className="my-auto flex items-center justify-center py-0.5">
+                  {propState?.ownerId ? (
+                    <Building3D
+                      tier={propState.level || 0}
+                      colorHex={ownerColorHex}
+                      size={isMobile ? 24 : 32}
+                    />
+                  ) : (
+                    <FantasyIcon name={tile.iconKey} className="w-3.5 h-3.5 sm:w-5 sm:h-5 md:w-6 md:h-6" glow={isRelic} />
+                  )}
+                </div>
+
+                {/* 4. CHÂN Ô: TÊN Ô CỜ & GIÁ TIỀN (CHUẨN LINE-HEIGHT, TUYỆT ĐỐI KHÔNG BỊ CẮT CHỮ) */}
+                <div className="w-full flex flex-col items-center justify-center text-center overflow-hidden pb-0.5">
+                  <div className="text-[6.5px] sm:text-[8px] md:text-[9.5px] font-extrabold text-stone-100 truncate w-full text-center leading-[1.3] drop-shadow">
+                    {tile.shortName || tile.name}
+                  </div>
+                  {tile.price > 0 && !propState?.ownerId && (
+                    <div className="text-[6px] sm:text-[7.5px] md:text-[8.5px] font-black text-amber-300 leading-[1.2]">
                       {tile.price}g
-                    </span>
-                  ) : null}
+                    </div>
+                  )}
+                  {propState?.ownerId && (
+                    <div className="text-[5.5px] sm:text-[7px] md:text-[8px] font-black text-emerald-400 leading-[1.2]">
+                      {tile.rents ? tile.rents[propState.level || 0] : tile.rent}g
+                    </div>
+                  )}
                 </div>
               </div>
             );
           })}
 
-          {/* QUÂN CỜ 3D CỦA TỪNG NGƯỜI CHƠI (TỰ ĐỘNG THU PHÓNG THEO MÀN HÌNH) */}
+          {/* QUÂN CỜ 3D CỦA TỪNG NGƯỜI CHƠI TRÊN CSS GRID */}
           {room.players.map((p, idx) => {
-            const posCss = getPosPercent(p.position || 0);
+            const pGrid = getTileGridArea(p.position || 0);
             const classData = CLASSES.find((c) => c.id === p.classId);
+            const sameTilePlayers = room.players.filter((other) => (other.position || 0) === (p.position || 0));
+            const myIdxOnTile = sameTilePlayers.indexOf(p);
+            const xOffset = (myIdxOnTile - (sameTilePlayers.length - 1) / 2) * (isMobile ? 4 : 7);
+
             return (
               <div
                 key={p.id}
-                style={{ ...posCss, transition: 'all 0.6s cubic-bezier(0.34, 1.56, 0.64, 1)' }}
-                className="absolute w-[9.09%] h-[9.09%] flex items-center justify-center z-20 pointer-events-none"
+                style={{
+                  gridRow: pGrid.row,
+                  gridColumn: pGrid.col,
+                  transform: `translateX(${xOffset}px)`,
+                  transition: 'all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1)'
+                }}
+                className="flex items-center justify-center z-30 pointer-events-none p-0.5"
               >
-                <PawnSVG
-                  classId={p.classId}
-                  hexColor={classData?.hex || 0xb91c1c}
-                  size={isMobile ? 28 : 46}
-                  isCurrentTurn={room.currentTurn === idx}
-                />
+                <div className="relative flex items-center justify-center drop-shadow-[0_4px_8px_rgba(0,0,0,0.9)] animate-bounce">
+                  <PawnSVG
+                    classId={p.classId}
+                    hexColor={classData?.hex || 0xb91c1c}
+                    size={isMobile ? 26 : 38}
+                    isCurrentTurn={room.currentTurn === idx}
+                  />
+                </div>
               </div>
             );
           })}
 
-          {/* KHU VỰC TRUNG TÂM BÀN CỜ (CENTER STAGE) */}
-          <div className="absolute inset-[13%] bg-stone-950/85 rounded-xl border border-amber-900/60 flex flex-col items-center justify-center backdrop-blur-md p-2 sm:p-5 shadow-inner">
-            
+          {/* KHU VỰC TRUNG TÂM BÀN CỜ (CHIẾM Ô GRID TỪ 2 ĐẾN 10 TRONG 11X11) */}
+          <div
+            style={{ gridRow: '2 / 11', gridColumn: '2 / 11' }}
+            className="bg-stone-950/90 rounded-xl border border-amber-900/60 flex flex-col items-center justify-center backdrop-blur-md p-2 sm:p-5 shadow-inner z-10 m-0.5 sm:m-1 overflow-hidden"
+          >
             {room.status === 'WAITING' ? (
-              // 1. Sảnh chờ khi chưa đủ người
+              // 1. Sảnh chờ
               <div className="text-center p-2">
                 <h2 className="text-xl sm:text-3xl font-black text-amber-500 mb-2">Đang Tập Hợp Tổ Đội...</h2>
                 <p className="text-stone-300 text-xs sm:text-base mb-3">
@@ -729,7 +796,7 @@ export default function MonopolyGame() {
                 {room.players.length >= 2 ? (
                   <button
                     onClick={handleStartGame}
-                    className="bg-emerald-700 hover:bg-emerald-600 text-white font-extrabold py-2.5 px-8 rounded-xl shadow-[0_0_20px_rgba(4,120,87,0.7)] text-sm sm:text-lg transition"
+                    className="bg-emerald-700 hover:bg-emerald-600 text-white font-extrabold py-2.5 px-8 rounded-xl shadow-[0_0_20px_rgba(4,120,87,0.7)] text-sm sm:text-lg transition cursor-pointer"
                   >
                     Bắt Đầu Cuộc Chinh Phạt
                   </button>
@@ -755,8 +822,8 @@ export default function MonopolyGame() {
 
                 {/* 2 Viên Xúc Xắc D6 chuyên nghiệp của Monopoly */}
                 <div className="flex gap-4 sm:gap-8 items-center my-1 sm:my-3">
-                  <Dice3D type="D6" isRolling={isRollingD6} result={d6Val1} size={isMobile ? 70 : 95} theme="ivory" />
-                  <Dice3D type="D6" isRolling={isRollingD6} result={d6Val2} size={isMobile ? 70 : 95} theme="ivory" />
+                  <Dice3D type="D6" isRolling={isRollingD6} result={d6Val1} size={isMobile ? 65 : 90} theme="ivory" />
+                  <Dice3D type="D6" isRolling={isRollingD6} result={d6Val2} size={isMobile ? 65 : 90} theme="ivory" />
                 </div>
 
                 <div className="text-xs sm:text-sm font-black text-amber-400 mb-3 bg-stone-900/80 px-3 py-1 rounded-full border border-amber-900/60 shadow">
@@ -785,7 +852,7 @@ export default function MonopolyGame() {
         </div>
       </div>
 
-      {/* Mobile / Desktop Drawer: Xem Chi Tiết Ô Đất Được Nhấp Vào (Tile Inspector) */}
+      {/* Drawer: Xem Chi Tiết Ô Đất Được Nhấp Vào (Tile Inspector) */}
       {inspectedTile && (
         <div className="fixed inset-x-2 bottom-3 sm:bottom-6 z-50 flex items-center justify-center pointer-events-auto">
           <div className="w-full max-w-md bg-stone-900/98 border-2 border-amber-500 rounded-xl p-3 sm:p-4 shadow-[0_10px_40px_rgba(0,0,0,0.95)] backdrop-blur-md">
@@ -796,7 +863,7 @@ export default function MonopolyGame() {
               </div>
               <button
                 onClick={() => setInspectedTile(null)}
-                className="w-6 h-6 rounded-full bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-bold flex items-center justify-center"
+                className="w-6 h-6 rounded-full bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-bold flex items-center justify-center cursor-pointer"
               >
                 ✕
               </button>
@@ -806,7 +873,7 @@ export default function MonopolyGame() {
               <p className="mb-2 italic text-stone-400">{inspectedTile.desc || 'Bất động sản thương mại vương quốc.'}</p>
               
               {inspectedTile.price > 0 && (
-                <div className="bg-stone-950 p-2 rounded-lg border border-stone-800 space-y-1 text-[11px]">
+                <div className="bg-stone-950 p-2.5 rounded-lg border border-stone-800 space-y-1.5 text-[11px]">
                   <div className="flex justify-between">
                     <span className="text-stone-400">Giá mua lãnh địa:</span>
                     <span className="text-amber-400 font-bold">{inspectedTile.price} Gold</span>
@@ -814,7 +881,7 @@ export default function MonopolyGame() {
                   {inspectedTile.rents && (
                     <>
                       <div className="flex justify-between">
-                        <span className="text-stone-400">Thuế Đất Khảo Sát:</span>
+                        <span className="text-stone-400">Thuế Đất Khảo Sát (🚩):</span>
                         <span className="text-stone-200">{inspectedTile.rents[0]}g</span>
                       </div>
                       <div className="flex justify-between">
@@ -838,12 +905,12 @@ export default function MonopolyGame() {
         </div>
       )}
 
-      {/* SIDEBAR TỔ ĐỘI & NHẬT KÝ (HIỆN TRÊN DESKTOP HOẶC CHUYỂN TAB TRÊN MOBILE) */}
+      {/* SIDEBAR TỔ ĐỘI & NHẬT KÝ */}
       <div className={`w-full lg:w-80 bg-stone-950 border-t lg:border-t-0 lg:border-l border-stone-800 flex flex-col h-full z-20 shadow-[-10px_0_30px_rgba(0,0,0,0.6)] ${
         activeMobileTab === 'BOARD' ? 'hidden lg:flex' : 'flex'
       }`}>
         
-        {/* TAB TỔ ĐỘI (PARTY STATS) */}
+        {/* TAB TỔ ĐỘI */}
         {(activeMobileTab === 'PARTY' || !isMobile) && (
           <div className="p-3 sm:p-4 bg-stone-900 border-b border-amber-900/50">
             <div className="flex justify-between items-center mb-3">
@@ -890,7 +957,7 @@ export default function MonopolyGame() {
           </div>
         )}
 
-        {/* TAB NHẬT KÝ CHIẾN TRƯỜNG (LOGS) */}
+        {/* TAB NHẬT KÝ CHIẾN TRƯỜNG */}
         {(activeMobileTab === 'LOGS' || !isMobile) && (
           <div className="flex-1 p-3 overflow-y-auto text-xs text-stone-400 font-mono leading-relaxed bg-stone-950/90">
             <div className="text-[10px] uppercase font-bold text-amber-600 mb-2 tracking-wider flex items-center gap-1">

@@ -1086,6 +1086,178 @@ export function buildPieceModel(pieceType = 'fighter', colorHex = 0xb91c1c) {
   return root;
 }
 
+// ----------------------------------------------------------------------------
+// 2B. PROCEDURAL 3D BUILDING MODELS (OWNERSHIP FLAG, CAMP, TOWER, CITADEL)
+// ----------------------------------------------------------------------------
+export function buildBuildingModel(tier = 0, colorHex = 0xb91c1c) {
+  const root = new THREE.Group();
+  const playerMat = new THREE.MeshStandardMaterial({ color: colorHex, metalness: 0.5, roughness: 0.3 });
+  const goldMat = new THREE.MeshStandardMaterial({ color: 0xfbbf24, metalness: 0.85, roughness: 0.2 });
+  const stoneMat = new THREE.MeshStandardMaterial({ color: 0x475569, metalness: 0.2, roughness: 0.7 });
+  const woodMat = new THREE.MeshStandardMaterial({ color: 0x78350f, roughness: 0.8 });
+
+  switch (tier) {
+    case 1: {
+      // ⛺ Trại Tiền Đồn (Adventurer's Tent & Campfire)
+      const base = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.6, 0.08, 16), stoneMat);
+      base.position.y = 0.04;
+      root.add(base);
+
+      // A-frame Tent
+      const tentGeo = new THREE.ConeGeometry(0.42, 0.65, 4);
+      const tent = new THREE.Mesh(tentGeo, playerMat);
+      tent.rotation.y = Math.PI / 4;
+      tent.position.set(-0.08, 0.36, 0);
+      root.add(tent);
+
+      // Wooden ridge pole
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.75, 8), woodMat);
+      pole.position.set(-0.08, 0.42, 0);
+      pole.rotation.x = Math.PI / 2;
+      root.add(pole);
+
+      // Campfire
+      const fire = new THREE.Mesh(
+        new THREE.ConeGeometry(0.12, 0.25, 8),
+        new THREE.MeshStandardMaterial({ color: 0xf97316, emissive: 0xef4444, emissiveIntensity: 2 })
+      );
+      fire.position.set(0.32, 0.16, 0);
+      root.add(fire);
+      break;
+    }
+    case 2: {
+      // 🏰 Tháp Canh Đá (Stone Watchtower)
+      const towerGeo = new THREE.CylinderGeometry(0.35, 0.45, 0.85, 16);
+      const tower = new THREE.Mesh(towerGeo, stoneMat);
+      tower.position.y = 0.45;
+      root.add(tower);
+
+      // Parapet
+      const parapet = new THREE.Mesh(new THREE.CylinderGeometry(0.48, 0.42, 0.18, 16), playerMat);
+      parapet.position.y = 0.95;
+      root.add(parapet);
+
+      // 4 crenellations
+      for (let i = 0; i < 4; i++) {
+        const ang = (i * Math.PI) / 2;
+        const cren = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.15, 0.12), playerMat);
+        cren.position.set(Math.cos(ang) * 0.38, 1.08, Math.sin(ang) * 0.38);
+        root.add(cren);
+      }
+
+      // Flagstaff
+      const flagStaff = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 8), goldMat);
+      flagStaff.position.set(0, 1.25, 0);
+      root.add(flagStaff);
+
+      // Fluttering Pennant
+      const pennant = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, 0.02), playerMat);
+      pennant.position.set(0.12, 1.38, 0);
+      root.add(pennant);
+      break;
+    }
+    case 3: {
+      // 🏯 Đại Pháo Đài (Royal Citadel)
+      const mainKeep = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.7, 0.7), stoneMat);
+      mainKeep.position.y = 0.38;
+      root.add(mainKeep);
+
+      // 4 corner turrets
+      for (let i = 0; i < 4; i++) {
+        const x = (i % 2 === 0 ? 1 : -1) * 0.32;
+        const z = (i < 2 ? 1 : -1) * 0.32;
+        const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.9, 12), playerMat);
+        turret.position.set(x, 0.48, z);
+        const spire = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.38, 12), goldMat);
+        spire.position.set(x, 1.08, z);
+        root.add(turret);
+        root.add(spire);
+      }
+
+      // Central Grand Spire
+      const grandTower = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.25, 1.1, 16), stoneMat);
+      grandTower.position.y = 0.65;
+      const grandSpire = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.55, 16), goldMat);
+      grandSpire.position.y = 1.45;
+      root.add(grandTower);
+      root.add(grandSpire);
+      break;
+    }
+    case 0:
+    default: {
+      // 🚩 Cờ Sở Hữu / Boundary Stone
+      const stoneBase = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.42, 0.12, 12), stoneMat);
+      stoneBase.position.y = 0.06;
+      root.add(stoneBase);
+
+      const staff = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.95, 8), woodMat);
+      staff.position.y = 0.52;
+      root.add(staff);
+
+      const goldFinial = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 12), goldMat);
+      goldFinial.position.y = 1.02;
+      root.add(goldFinial);
+
+      const banner = new THREE.Mesh(new THREE.BoxGeometry(0.38, 0.28, 0.03), playerMat);
+      banner.position.set(0.2, 0.82, 0);
+      root.add(banner);
+      break;
+    }
+  }
+
+  return root;
+}
+
+export function Building3D({ tier = 0, colorHex = 0xb91c1c, size = 36 }) {
+  const mountRef = useRef(null);
+
+  useEffect(() => {
+    const mountEl = mountRef.current;
+    if (!mountEl) return;
+
+    const width = size;
+    const height = size;
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(40, width / height, 0.1, 50);
+    camera.position.set(0, 1.4, 2.8);
+    camera.lookAt(0, 0.5, 0);
+
+    const renderer = new THREE.WebGLRenderer({
+      alpha: true,
+      antialias: true,
+      powerPreference: 'low-power'
+    });
+    renderer.setSize(width, height);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+    mountEl.innerHTML = '';
+    mountEl.appendChild(renderer.domElement);
+
+    const ambLight = new THREE.AmbientLight(0xffffff, 1.2);
+    scene.add(ambLight);
+
+    const dirLight = new THREE.DirectionalLight(0xffffff, 2.2);
+    dirLight.position.set(3, 5, 4);
+    scene.add(dirLight);
+
+    const model = buildBuildingModel(tier, colorHex);
+    model.rotation.y = Math.PI * 0.25;
+    scene.add(model);
+
+    renderer.render(scene, camera);
+
+    return () => {
+      disposeHierarchy(scene);
+      renderer.dispose();
+      renderer.forceContextLoss();
+      if (mountEl) mountEl.innerHTML = '';
+    };
+  }, [tier, colorHex, size]);
+
+  return <div ref={mountRef} style={{ width: size, height: size }} className="inline-flex items-center justify-center pointer-events-none drop-shadow" />;
+}
+
 // ============================================================================
 // 3. REACT 3D COMPONENT: PIECE3D (ON-DEMAND & SMOOTH GPU OPTIMIZED)
 // ============================================================================
