@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { BOARD_TILES, GROUP_COLORS, INSTANT_WIN_RELIC_IDS, getClass, hexToCss, tileAccent } from './data.js';
-import { TIER_NAMES, getUpgradeCost } from './engine.js';
+import { TIER_NAMES, GO_SALARY, JAIL_BAIL, JAIL_DC, getUpgradeCost } from './engine.js';
 import { FantasyIcon } from '../../components/Monopoly/FantasyIcons.jsx';
 
 const TYPE_LABEL = {
@@ -104,7 +104,17 @@ export default function TileInspector({ tile, room, onClose }) {
             )}
             {tile.type === 'TAX' && (
               <span className="rounded-full border border-rose-800 bg-stone-950 px-2 py-0.5 text-rose-300">
-                Phải nộp: {tile.price}g
+                Thuế: {Math.round(tile.taxRate * 100)}% vàng ({tile.taxMin}–{tile.taxMax}g)
+              </span>
+            )}
+            {tile.type === 'GO' && (
+              <span className="rounded-full border border-emerald-800 bg-stone-950 px-2 py-0.5 text-emerald-300">
+                Trợ cấp: {GO_SALARY}g mỗi vòng
+              </span>
+            )}
+            {tile.type === 'JAIL' && (
+              <span className="rounded-full border border-stone-700 bg-stone-950 px-2 py-0.5 text-stone-300">
+                Bảo lãnh: {JAIL_BAIL}g · D20 ≥ {JAIL_DC}
               </span>
             )}
           </div>

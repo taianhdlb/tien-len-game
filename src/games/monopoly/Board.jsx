@@ -31,6 +31,8 @@ function Tile({ tile, room, boardSize, onInspect }) {
   const relic = INSTANT_WIN_RELIC_IDS.includes(tile.id);
   const rent = prop && tile.rents ? tile.rents[prop.level || 0] : tile.rent;
   const iconPx = Math.round(Math.max(15, Math.min(corner ? 38 : 28, boardSize * (corner ? 0.052 : 0.038))));
+  const costLabel = tile.type === 'TAX' ? `${Math.round(tile.taxRate * 100)}%` : tile.price > 0 ? `${tile.price}g` : null;
+  const costAria = tile.type === 'TAX' ? `thuế ${costLabel}` : `giá ${tile.price} vàng`;
 
   return (
     <button
@@ -45,7 +47,7 @@ function Tile({ tile, room, boardSize, onInspect }) {
       className={`group relative flex min-h-0 min-w-0 flex-col items-center justify-between overflow-visible rounded-[3px] border p-[2px] transition hover:z-20 hover:brightness-125 focus:z-20 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
         corner ? 'border-amber-800/70' : 'border-stone-700/50'
       }`}
-      aria-label={`${tile.name}${tile.price ? `, giá ${tile.price} vàng` : ''}`}
+      aria-label={`${tile.name}${costLabel ? `, ${costAria}` : ''}`}
     >
       {owner && (
         <span
@@ -95,12 +97,14 @@ function Tile({ tile, room, boardSize, onInspect }) {
             {rent}g
           </span>
         ) : (
-          tile.price > 0 && (
+          costLabel && (
             <span
-              className="w-full truncate font-black leading-[1.2] text-amber-300/90"
+              className={`w-full truncate font-black leading-[1.2] ${
+                tile.type === 'TAX' ? 'text-rose-300/90' : 'text-amber-300/90'
+              }`}
               style={{ fontSize: 'clamp(4.5px, 0.95cqw, 8px)' }}
             >
-              {tile.price}g
+              {costLabel}
             </span>
           )
         )}

@@ -1,6 +1,5 @@
 import { BLESSINGS, BOARD_TILES, EVENTS, INSTANT_WIN_RELIC_IDS, getClass } from './data.js';
-import { JAIL_BAIL, JAIL_DC, TIER_NAMES, getUpgradeCost, isSuccess } from './engine.js';
-import { Dice3D } from '../../three/Dice3D.jsx';
+import { JAIL_BAIL, JAIL_DC, TIER_NAMES, getUpgradeCost, isSuccess } from './engine.js';import { Dice3D } from '../../three/Dice3D.jsx';
 import { FantasyIcon } from '../../components/Monopoly/FantasyIcons.jsx';
 
 const OUTCOME = {
@@ -94,19 +93,38 @@ function buildView(room, pending) {
     const tile = BOARD_TILES[pending.tileId];
     const owner = room.players.find((p) => p.id === pending.ownerId);
     const broke = gold < pending.amount;
+    const relicBuyout = tile.type === 'RELIC' ? pending.buyoutPrice : null;
     return {
       ...base,
       icon: tile.iconKey,
-      eyebrow: 'Lãnh Địa Có Chủ',
-      title: `Thuế Đất · ${tile.name}`,
+      eyebrow: relicBuyout ? 'Thánh Vật Có Chủ' : 'Lãnh Địa Có Chủ',
+      title: relicBuyout ? `Thánh Vật · ${tile.name}` : `Thuế Đất · ${tile.name}`,
       speaker: owner?.name || 'Chủ lãnh địa',
-      text: `Bạn đặt chân vào lãnh địa của ${owner?.name || 'đối thủ'}. Hãy thanh toán tiền thuê để tiếp tục hành trình.`,
-      meta: [`Phải trả: ${pending.amount}g`, `Vàng của bạn: ${gold}g`, ...(broke ? ['⚠️ Sẽ phá sản!'] : [])],
+      text: relicBuyout
+        ? `${owner?.name || 'Đối thủ'} đang giữ ${tile.name}. Trả thuê để đi tiếp, hoặc trả giá cao hơn để chuộc lại Thánh Vật.`
+        : `Bạn đặt chân vào lãnh địa của ${owner?.name || 'đối thủ'}. Hãy thanh toán tiền thuê để tiếp tục hành trình.`,
+      meta: [
+        `Phải trả: ${pending.amount}g`,
+        `Vàng của bạn: ${gold}g`,
+        ...(relicBuyout ? [`Chuộc Thánh Vật: ${relicBuyout}g`] : []),
+        ...(broke ? ['⚠️ Sẽ phá sản!'] : [])
+      ],
       actions: [
+        ...(relicBuyout
+          ? [
+              {
+                label: `Chuộc Thánh Vật · ${relicBuyout}g`,
+                action: { type: 'BUY_RELIC' },
+                tone: 'primary',
+                disabled: gold < relicBuyout,
+                hint: gold < relicBuyout ? 'Không đủ vàng' : null
+              }
+            ]
+          : []),
         {
           label: `Thanh toán · ${pending.amount}g`,
           action: { type: 'PAY' },
-          tone: broke ? 'danger' : 'primary'
+          tone: relicBuyout ? 'ghost' : broke ? 'danger' : 'primary'
         }
       ]
     };

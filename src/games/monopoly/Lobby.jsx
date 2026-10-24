@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { CLASSES, getClass, hexToCss } from './data.js';
+import { STARTING_GOLD, MAX_ROUNDS } from './engine.js';
 import { getSavedName } from '../../lib/player.js';
 import { useToast } from '../../components/toast-context.js';
 import { Piece3D } from '../../three/Piece3D.jsx';
@@ -90,7 +91,7 @@ export default function Lobby({ connected, onJoin, onOpenGallery }) {
             </p>
             <p className="mt-0.5 text-xs leading-snug text-stone-400">{selected.desc}</p>
             <p className="mt-1 text-[10px] font-semibold tracking-wide text-emerald-400/90 uppercase">
-              1.500 vàng khởi đầu · 3 Thánh Vật để chiến thắng
+              {STARTING_GOLD} vàng khởi đầu · 3 Thánh Vật · tối đa {MAX_ROUNDS} vòng
             </p>
           </div>
         </div>

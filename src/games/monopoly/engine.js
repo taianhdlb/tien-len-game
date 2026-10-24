@@ -1,12 +1,13 @@
 import { BOARD_TILES, EVENTS, BLESSINGS, INSTANT_WIN_RELIC_IDS } from './data.js';
 
-export const STARTING_GOLD = 1500;
-export const GO_SALARY = 200;
+export const STARTING_GOLD = 200;
+export const GO_SALARY = 120;
 export const JAIL_POSITION = 10;
-export const JAIL_BAIL = 50;
+export const JAIL_BAIL = 30;
 export const JAIL_DC = 12;
 export const MAX_JAIL_TURNS = 3;
 export const MAX_LEVEL = 3;
+export const MAX_ROUNDS = 40;
 export const MAX_LOGS = 100;
 export const BOARD_SIZE = BOARD_TILES.length;
 
@@ -16,7 +17,16 @@ export class GameError extends Error {}
 
 export const isActive = (p) => !p.bankrupt && !p.left;
 export const getRent = (tile, level = 0) => tile.rents?.[level] ?? 0;
-export const getUpgradeCost = (tile) => tile.upgradeCost ?? Math.round(tile.price * 0.6);
+export const getUpgradeCost = (tile) => tile.upgradeCost ?? Math.round(tile.price * 0.5);
+// Chuộc lại Thánh Vật đã có chủ: trả 150% giá trị hiện tại cho chủ cũ để không khóa chết mục tiêu 3 Thánh Vật.
+export const RELIC_BUYOUT_RATE = 1.5;
+export const getRelicBuyout = (tile, level = 0) =>
+  Math.round(((tile.price + getUpgradeCost(tile) * level) * RELIC_BUYOUT_RATE) / 5) * 5;
+// Thuế theo tỷ lệ ví giúp người mới không bị xóa sổ sớm và người giàu vẫn phải đóng góp về cuối ván.
+export const getTaxAmount = (tile, gold) => {
+  const scaled = Math.round((gold * tile.taxRate) / 5) * 5;
+  return Math.min(tile.taxMax, Math.max(tile.taxMin, scaled));
+};
 export const isSuccess = (outcome) => outcome === 'SUCCESS' || outcome === 'CRIT_SUCCESS';
 
 export function d20Outcome(roll, dc) {
@@ -29,6 +39,16 @@ export const currentPlayer = (state) => state.players[state.currentTurn];
 
 export function countRelics(state, playerId) {
   return INSTANT_WIN_RELIC_IDS.filter((id) => state.properties[id]?.ownerId === playerId).length;
+}
+
+export function getNetWorth(state, playerId) {
+  let worth = state.players.find((p) => p.id === playerId)?.gold ?? 0;
+  for (const [tileId, prop] of Object.entries(state.properties || {})) {
+    if (prop.ownerId !== playerId) continue;
+    const tile = BOARD_TILES[Number(tileId)];
+    worth += tile.price + getUpgradeCost(tile) * (prop.level || 0);
+  }
+  return worth;
 }
 
 const rollDie = (rng, sides) => Math.floor(rng() * sides) + 1;
@@ -92,6 +112,30 @@ function checkWinner(s) {
   }
 }
 
+function finishByTimeLimit(s) {
+  s.pending = null;
+  const alive = s.players.filter(isActive);
+  if (!alive.length) {
+    s.status = 'FINISHED';
+    s.winnerId = null;
+    return;
+  }
+  const ranked = [...alive].sort((a, b) => {
+    const relicDiff = countRelics(s, b.id) - countRelics(s, a.id);
+    if (relicDiff) return relicDiff;
+    return getNetWorth(s, b.id) - getNetWorth(s, a.id) || b.gold - a.gold;
+  });
+  const winner = ranked[0];
+  s.status = 'FINISHED';
+  s.winnerId = winner.id;
+  s.winReason = 'TIME';
+  log(
+    s,
+    `Hết ${MAX_ROUNDS} vòng chinh phạt! ${winner.name} thắng với ${countRelics(s, winner.id)} Thánh Vật và tổng tài sản ${getNetWorth(s, winner.id)}g.`,
+    'victory'
+  );
+}
+
 function startTurn(s) {
   const idx = s.currentTurn;
   const p = s.players[idx];
@@ -119,6 +163,10 @@ function endTurn(s) {
   }
   s.currentTurn = next;
   s.turnNumber = (s.turnNumber || 0) + 1;
+  if (s.turnNumber > (s.turnLimit ?? MAX_ROUNDS * s.players.length)) {
+    finishByTimeLimit(s);
+    return;
+  }
   startTurn(s);
 }
 
@@ -136,7 +184,13 @@ function land(s, rng) {
         if (prop) delete s.properties[tile.id];
         s.pending = { kind: 'BUY', tileId: tile.id };
       } else if (owner.id !== p.id) {
-        s.pending = { kind: 'RENT', tileId: tile.id, ownerId: owner.id, amount: getRent(tile, prop.level) };
+        s.pending = {
+          kind: 'RENT',
+          tileId: tile.id,
+          ownerId: owner.id,
+          amount: getRent(tile, prop.level),
+          ...(tile.type === 'RELIC' ? { buyoutPrice: getRelicBuyout(tile, prop.level) } : {})
+        };
       } else if (prop.level < MAX_LEVEL) {
         s.pending = { kind: 'UPGRADE', tileId: tile.id };
       } else {
@@ -152,7 +206,7 @@ function land(s, rng) {
       s.pending = { kind: 'BLESSING', blessingId: pick(rng, BLESSINGS).id };
       return;
     case 'TAX':
-      s.pending = { kind: 'TAX', tileId: tile.id, amount: tile.price };
+      s.pending = { kind: 'TAX', tileId: tile.id, amount: getTaxAmount(tile, p.gold) };
       return;
     case 'TELEPORT':
       s.pending = { kind: 'TELEPORT', tileId: tile.id, target: tile.target };
@@ -168,6 +222,14 @@ function land(s, rng) {
 function requirePending(s, ...kinds) {
   if (!s.pending || !kinds.includes(s.pending.kind)) fail('Hành động không hợp lệ ở thời điểm này.');
   return s.pending;
+}
+
+function finishRelicWin(s, p) {
+  s.status = 'FINISHED';
+  s.winnerId = p.id;
+  s.winReason = 'RELICS';
+  s.pending = null;
+  log(s, `CHIẾN THẮNG TUYỆT ĐỐI! ${p.name} đã thu thập đủ 3 Thánh Vật!`, 'victory');
 }
 
 function resolveD20(s, idx, pending, rng) {
@@ -218,7 +280,7 @@ function resolveD20(s, idx, pending, rng) {
   }
 }
 
-function startGame(s, playerId) {
+function startGame(s, playerId, rng) {
   if (s.status === 'PLAYING') fail('Trận đấu đang diễn ra.');
   const connected = s.players.filter((p) => !p.left);
   if (connected[0]?.id !== playerId) fail('Chỉ chủ phòng mới có thể bắt đầu!');
@@ -234,8 +296,9 @@ function startGame(s, playerId) {
   }));
   s.status = 'PLAYING';
   s.properties = {};
-  s.currentTurn = 0;
+  s.currentTurn = Math.floor(rng() * s.players.length);
   s.turnNumber = 1;
+  s.turnLimit = MAX_ROUNDS * s.players.length;
   s.pending = null;
   s.dice = [3, 4];
   s.rollSeq = 0;
@@ -243,6 +306,7 @@ function startGame(s, playerId) {
   s.winnerId = null;
   s.winReason = null;
   log(s, `Cuộc chinh phạt bắt đầu! Mỗi chiến binh nhận ${STARTING_GOLD}g lộ phí.`, 'gold');
+  log(s, `Giới hạn ${MAX_ROUNDS} vòng: hết hạn, người nhiều Thánh Vật rồi đến tổng tài sản cao nhất sẽ thắng.`, 'muted');
 }
 
 // Pure reducer: returns the next room state or throws GameError. `rng` is injectable for deterministic tests.
@@ -250,7 +314,7 @@ export function reduce(state, playerId, action, rng = Math.random) {
   const s = structuredClone(state);
 
   if (action.type === 'START') {
-    startGame(s, playerId);
+    startGame(s, playerId, rng);
     s.version = (state.version || 0) + 1;
     return s;
   }
@@ -298,11 +362,29 @@ export function reduce(state, playerId, action, rng = Math.random) {
       s.properties[tileId] = { ownerId: p.id, level: 0 };
       log(s, `${p.name} mua ${tile.name} với giá ${tile.price}g.`, 'gold');
       if (tile.type === 'RELIC' && countRelics(s, p.id) === INSTANT_WIN_RELIC_IDS.length) {
-        s.status = 'FINISHED';
-        s.winnerId = p.id;
-        s.winReason = 'RELICS';
-        s.pending = null;
-        log(s, `CHIẾN THẮNG TUYỆT ĐỐI! ${p.name} đã thu thập đủ 3 Thánh Vật!`, 'victory');
+        finishRelicWin(s, p);
+      } else {
+        endTurn(s);
+      }
+      break;
+    }
+
+    case 'BUY_RELIC': {
+      const pending = requirePending(s, 'RENT');
+      const tile = BOARD_TILES[pending.tileId];
+      if (tile.type !== 'RELIC' || !pending.buyoutPrice) fail('Ô này không thể chuộc Thánh Vật.');
+      if (p.gold < pending.buyoutPrice) fail('Không đủ vàng để chuộc Thánh Vật.');
+      const owner = s.players.find((x) => x.id === pending.ownerId);
+      p.gold -= pending.buyoutPrice;
+      if (owner) owner.gold += pending.buyoutPrice;
+      s.properties[tile.id] = { ownerId: p.id, level: s.properties[tile.id]?.level ?? 0 };
+      log(
+        s,
+        `${p.name} chuộc ${tile.name} từ ${owner?.name || 'chủ cũ'} với giá ${pending.buyoutPrice}g.`,
+        'gold'
+      );
+      if (countRelics(s, p.id) === INSTANT_WIN_RELIC_IDS.length) {
+        finishRelicWin(s, p);
       } else {
         endTurn(s);
       }

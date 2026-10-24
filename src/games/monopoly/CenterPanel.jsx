@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { getClass } from './data.js';
-import { countRelics } from './engine.js';
+import { countRelics, MAX_ROUNDS } from './engine.js';
 import { INSTANT_WIN_RELIC_IDS } from './data.js';
 import { Dice3D } from '../../three/Dice3D.jsx';
 import { PieceImage } from '../../three/Piece3D.jsx';
@@ -20,6 +20,10 @@ export default function CenterPanel({ room, myId, isMyTurn, boardSize, onDispatc
   const current = room.status === 'PLAYING' ? room.players[room.currentTurn] : null;
   const currentClass = current ? getClass(current.classId) : null;
   const diceSize = Math.round(Math.max(30, Math.min(84, boardSize * 0.115)));
+  const round = Math.min(
+    MAX_ROUNDS,
+    Math.max(1, Math.ceil((room.turnNumber || 1) / Math.max(1, room.players.length)))
+  );
 
   useEffect(() => () => clearTimeout(lockTimer.current), []);
 
@@ -99,9 +103,11 @@ export default function CenterPanel({ room, myId, isMyTurn, boardSize, onDispatc
         <p className="max-w-[85%] text-stone-300" style={T.tiny}>
           {room.winReason === 'RELICS'
             ? 'Thu thập đủ 3 Thánh Vật quyền năng và thống trị vương quốc!'
-            : winner
-              ? 'Là chiến binh cuối cùng trụ vững trên bàn cờ.'
-              : 'Không còn chiến binh nào trên bàn cờ.'}
+            : room.winReason === 'TIME'
+              ? `Hết ${MAX_ROUNDS} vòng chinh phạt — người nhiều Thánh Vật và tài sản nhất lên ngôi!`
+              : winner
+                ? 'Là chiến binh cuối cùng trụ vững trên bàn cờ.'
+                : 'Không còn chiến binh nào trên bàn cờ.'}
         </p>
         {winner && (
           <div className="flex items-center gap-1.5 rounded-full border border-amber-700/50 bg-stone-900/90 px-2 py-0.5" style={T.tiny}>
@@ -134,6 +140,9 @@ export default function CenterPanel({ room, myId, isMyTurn, boardSize, onDispatc
         <span className="text-stone-400">Lượt của</span>
         <span className="max-w-[13cqw] truncate font-extrabold text-amber-300">{current?.name}</span>
         {current?.id === myId && <span className="text-emerald-400">(Bạn)</span>}
+        <span className="ml-0.5 rounded-full bg-stone-800 px-1.5 text-stone-300" aria-label={`Vòng ${round} trên ${MAX_ROUNDS}`}>
+          {round}/{MAX_ROUNDS}
+        </span>
       </div>
 
       <div className="flex items-center justify-center gap-[clamp(6px,2.2cqw,28px)]">
