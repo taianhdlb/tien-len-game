@@ -527,6 +527,184 @@ export function buildPieceModel(pieceType = 'fighter', colorHex = 0xb91c1c) {
     // ------------------------------------------------------------------------
     // B. CLASSIC CHESS PIECES
     // ------------------------------------------------------------------------
+    case 'horse': {
+      // Warhorse figurine for Cờ Cá Ngựa: lacquered body, gold tack, flowing mane.
+      const fig = new THREE.Group();
+      const shade = new THREE.Color(colorHex).multiplyScalar(0.45);
+      const maneMat = new THREE.MeshStandardMaterial({ color: shade, roughness: 0.55, metalness: 0.2 });
+      const hoofMat = new THREE.MeshStandardMaterial({ color: 0x1c1917, roughness: 0.65, metalness: 0.25 });
+      const eyeMat = new THREE.MeshStandardMaterial({ color: 0x050505, roughness: 0.3, metalness: 0.4 });
+
+      // Barrel and rounded chest / hindquarters.
+      const barrel = new THREE.Mesh(new THREE.SphereGeometry(0.34, 24, 18), playerMat);
+      barrel.scale.set(0.85, 0.86, 1.3);
+      barrel.position.set(0, 0.94, -0.02);
+      fig.add(barrel);
+
+      const chest = new THREE.Mesh(new THREE.SphereGeometry(0.26, 20, 16), playerMat);
+      chest.scale.set(1, 1.05, 0.95);
+      chest.position.set(0, 0.94, 0.34);
+      fig.add(chest);
+
+      const rump = new THREE.Mesh(new THREE.SphereGeometry(0.28, 20, 16), playerMat);
+      rump.scale.set(1, 1.02, 1);
+      rump.position.set(0, 0.94, -0.4);
+      fig.add(rump);
+
+      // Arched neck leaning toward +Z (camera).
+      const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.23, 0.6, 18), playerMat);
+      neck.position.set(0, 1.27, 0.32);
+      neck.rotation.x = 0.42;
+      fig.add(neck);
+
+      // Cranium, tapered face and rounded muzzle.
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.165, 20, 16), playerMat);
+      head.scale.set(0.95, 1.08, 1.15);
+      head.position.set(0, 1.54, 0.44);
+      head.rotation.x = 0.35;
+      fig.add(head);
+
+      const face = new THREE.Mesh(new THREE.CylinderGeometry(0.082, 0.155, 0.44, 10), playerMat);
+      face.position.set(0, 1.4, 0.62);
+      face.rotation.x = 2.18;
+      fig.add(face);
+
+      const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.09, 14, 12), playerMat);
+      muzzle.scale.set(0.9, 0.85, 1.1);
+      muzzle.position.set(0, 1.29, 0.78);
+      fig.add(muzzle);
+
+      // Ears, eyes and nostrils.
+      for (const side of [-1, 1]) {
+        const ear = new THREE.Mesh(new THREE.ConeGeometry(0.05, 0.15, 10), playerMat);
+        ear.position.set(side * 0.07, 1.66, 0.36);
+        ear.rotation.x = -0.1;
+        fig.add(ear);
+
+        const eye = new THREE.Mesh(new THREE.SphereGeometry(0.03, 10, 10), eyeMat);
+        eye.position.set(side * 0.135, 1.5, 0.6);
+        fig.add(eye);
+
+        const nostril = new THREE.Mesh(new THREE.SphereGeometry(0.016, 8, 8), eyeMat);
+        nostril.position.set(side * 0.035, 1.31, 0.85);
+        fig.add(nostril);
+      }
+
+      const blaze = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.34, 0.03), goldMat);
+      blaze.position.set(0, 1.47, 0.71);
+      blaze.rotation.x = -0.75;
+      fig.add(blaze);
+
+      const browStar = new THREE.Mesh(new THREE.SphereGeometry(0.042, 12, 12), goldMat);
+      browStar.position.set(0, 1.61, 0.58);
+      fig.add(browStar);
+
+      const forelock = new THREE.Mesh(new THREE.ConeGeometry(0.04, 0.16, 8), maneMat);
+      forelock.position.set(0, 1.66, 0.48);
+      forelock.rotation.x = 0.9;
+      fig.add(forelock);
+
+      // Flowing mane down the crest of the neck.
+      const maneCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-0.02, 1.68, 0.38),
+        new THREE.Vector3(-0.03, 1.54, 0.24),
+        new THREE.Vector3(-0.03, 1.34, 0.1),
+        new THREE.Vector3(-0.02, 1.14, 0)
+      ]);
+      const mane = new THREE.Mesh(new THREE.TubeGeometry(maneCurve, 16, 0.055, 8, false), maneMat);
+      fig.add(mane);
+
+      for (let i = 0; i < 3; i++) {
+        const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.065 - i * 0.012, 0.19, 8), maneMat);
+        tuft.position.set(-0.03, 1.58 - i * 0.13, 0.3 - i * 0.1);
+        tuft.rotation.x = 2.4;
+        fig.add(tuft);
+      }
+
+      // Tail sweeping back and down.
+      const tailCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(0, 1.1, -0.52),
+        new THREE.Vector3(-0.06, 0.98, -0.7),
+        new THREE.Vector3(-0.12, 0.7, -0.8),
+        new THREE.Vector3(-0.16, 0.45, -0.72)
+      ]);
+      const tail = new THREE.Mesh(new THREE.TubeGeometry(tailCurve, 16, 0.052, 8, false), maneMat);
+      fig.add(tail);
+
+      const tailTip = new THREE.Mesh(new THREE.ConeGeometry(0.058, 0.19, 8), maneMat);
+      tailTip.position.set(-0.17, 0.42, -0.7);
+      tailTip.rotation.z = -0.25;
+      fig.add(tailTip);
+
+      // Saddle blanket, saddle and breast collar.
+      const blanket = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.035, 0.5), maneMat);
+      blanket.position.set(0, 1.235, 0);
+      fig.add(blanket);
+
+      const saddle = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.09, 0.32), goldMat);
+      saddle.position.set(0, 1.28, 0);
+      fig.add(saddle);
+
+      const cantle = new THREE.Mesh(new THREE.TorusGeometry(0.14, 0.026, 8, 18, Math.PI), goldMat);
+      cantle.position.set(0, 1.32, -0.16);
+      cantle.rotation.x = Math.PI / 2;
+      fig.add(cantle);
+
+      // Breast strap across the chest.
+      const breastCurve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-0.27, 1.1, 0.36),
+        new THREE.Vector3(0, 1.06, 0.58),
+        new THREE.Vector3(0.27, 1.1, 0.36)
+      ]);
+      const breast = new THREE.Mesh(new THREE.TubeGeometry(breastCurve, 12, 0.018, 6, false), goldMat);
+      fig.add(breast);
+
+      // Noseband and reins.
+      const noseband = new THREE.Mesh(new THREE.TorusGeometry(0.098, 0.014, 6, 16, Math.PI), goldMat);
+      noseband.position.set(0, 1.29, 0.79);
+      noseband.rotation.set(0.2, 0, Math.PI);
+      fig.add(noseband);
+
+      for (const side of [-1, 1]) {
+        const reinCurve = new THREE.CatmullRomCurve3([
+          new THREE.Vector3(side * 0.11, 1.32, 0.77),
+          new THREE.Vector3(side * 0.27, 1.25, 0.42),
+          new THREE.Vector3(side * 0.2, 1.24, 0.1)
+        ]);
+        const rein = new THREE.Mesh(new THREE.TubeGeometry(reinCurve, 12, 0.012, 6, false), goldMat);
+        fig.add(rein);
+
+        const strap = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.3, 6), goldMat);
+        strap.position.set(side * 0.24, 1.13, 0.02);
+        fig.add(strap);
+        const stirrup = new THREE.Mesh(new THREE.TorusGeometry(0.05, 0.015, 6, 12), goldMat);
+        stirrup.position.set(side * 0.24, 0.96, 0.02);
+        stirrup.rotation.y = Math.PI / 2;
+        fig.add(stirrup);
+      }
+
+      // Legs and hooves, front pair slightly forward for a proud stance.
+      const legs = [
+        [-0.165, 0.24, 0.07],
+        [0.165, 0.24, 0.07],
+        [-0.165, -0.26, -0.06],
+        [0.165, -0.26, -0.06]
+      ];
+      for (const [x, z, lean] of legs) {
+        const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.048, 0.062, 0.56, 10), playerMat);
+        leg.position.set(x, 0.56, z);
+        leg.rotation.x = lean;
+        fig.add(leg);
+
+        const hoof = new THREE.Mesh(new THREE.CylinderGeometry(0.078, 0.073, 0.08, 10), hoofMat);
+        hoof.position.set(x, 0.315, z + lean * 0.24);
+        fig.add(hoof);
+      }
+
+      root.add(fig);
+      break;
+    }
+
     case 'knight': {
       // Horse head chess piece
       const fig = new THREE.Group();
@@ -972,6 +1150,7 @@ export const PIECE_CATALOG = [
   { id: 'druid', name: 'Druid', category: 'D&D Hero', icon: '🌿', color: 0x15803d, desc: 'Hiền Triết Thiên Nhiên Sừng Hươu & Ngọc Lục Bảo' },
   { id: 'warlock', name: 'Warlock', category: 'D&D Hero', icon: '👁️', color: 0x4338ca, desc: 'Thuật Sĩ Hư Không Mắt Quỷ & Sách Ma Đạo' },
   { id: 'sorcerer', name: 'Sorcerer', category: 'D&D Hero', icon: '⚡', color: 0x0891b2, desc: 'Phù Thủy Long Tộc Tháp Tinh Thể Sấm Sét' },
+  { id: 'horse', name: 'Chiến Mã', category: 'Cờ Cá Ngựa', icon: '🐴', color: 0xef4444, desc: 'Chiến mã bờm vàng, yên cương lụa là' },
   // Classic Chess
   { id: 'pawn', name: 'Tốt (Pawn)', category: 'Cờ Vua', icon: '♟️', color: 0xe2e8f0, desc: 'Quân Tốt Cờ Vua Gỗ Tiện Hoàng Gia' },
   { id: 'knight', name: 'Mã (Knight)', category: 'Cờ Vua', icon: '♞', color: 0xe2e8f0, desc: 'Chiến Mã Tinh Xảo Với Bờm & Dây Cương' },
