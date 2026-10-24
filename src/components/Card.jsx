@@ -1,36 +1,54 @@
-import React from 'react';
+const SIZES = {
+  sm: { box: 'h-10 w-7 rounded-[4px] text-[9px]', suit: 'text-sm' },
+  md: { box: 'h-14 w-10 rounded-md text-[11px] sm:h-16 sm:w-11 sm:text-xs', suit: 'text-lg sm:text-xl' },
+  lg: { box: 'h-[4.5rem] w-12 rounded-lg text-xs sm:h-20 sm:w-14', suit: 'text-xl sm:text-2xl' }
+};
 
-export default function Card({ card, isSelected, onClick, disabled }) {
+export default function Card({ card, selected = false, onClick, disabled = false, size = 'md' }) {
   if (!card) return null;
-
-  const isRed = card.suitColor === 'red';
+  const red = card.suitColor === 'red';
+  const tone = red ? 'text-rose-600' : 'text-stone-900';
+  const s = SIZES[size] || SIZES.md;
+  const clickable = Boolean(onClick) && !disabled;
 
   return (
-    <div
-      onClick={!disabled ? onClick : undefined}
-      className={`
-        relative w-14 h-20 sm:w-16 sm:h-24 md:w-20 md:h-28 bg-white rounded-lg border-2 shadow-md 
-        select-none cursor-pointer transition-transform duration-150 flex flex-col justify-between p-1 sm:p-2
-        ${isSelected ? '-translate-y-5 border-yellow-400 ring-2 ring-yellow-300' : 'border-gray-300 hover:-translate-y-1'}
-        ${disabled ? 'opacity-50 cursor-not-allowed' : ''}
-      `}
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={!clickable}
+      aria-pressed={onClick ? selected : undefined}
+      aria-label={`${card.rankLabel} ${card.suitSymbol}`}
+      className={`relative flex shrink-0 select-none flex-col justify-between border bg-gradient-to-b from-white to-stone-100 p-1 font-bold shadow-md transition-all duration-150 disabled:opacity-100 enabled:hover:-translate-y-1 ${s.box} ${
+        selected
+          ? '-translate-y-3 border-amber-400 ring-2 ring-amber-300 shadow-[0_8px_18px_rgba(0,0,0,0.45)]'
+          : 'border-stone-300/90'
+      } ${clickable ? 'cursor-pointer' : 'cursor-default'}`}
     >
-      {/* Góc trên trái */}
-      <div className={`text-xs sm:text-sm font-bold leading-none ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
-        <div>{card.rankLabel}</div>
-        <div>{card.suitSymbol}</div>
-      </div>
-
-      {/* Biểu tượng trung tâm */}
-      <div className={`text-xl sm:text-2xl md:text-3xl text-center font-bold ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
+      <span className={`leading-none ${tone}`}>
+        <span className="block">{card.rankLabel}</span>
+        <span className="block">{card.suitSymbol}</span>
+      </span>
+      <span className={`self-center leading-none ${tone} ${s.suit}`} aria-hidden="true">
         {card.suitSymbol}
-      </div>
+      </span>
+      <span className={`rotate-180 self-end leading-none ${tone}`} aria-hidden="true">
+        <span className="block">{card.rankLabel}</span>
+        <span className="block">{card.suitSymbol}</span>
+      </span>
+    </button>
+  );
+}
 
-      {/* Góc dưới phải */}
-      <div className={`text-xs sm:text-sm font-bold leading-none self-end rotate-180 ${isRed ? 'text-red-600' : 'text-gray-900'}`}>
-        <div>{card.rankLabel}</div>
-        <div>{card.suitSymbol}</div>
-      </div>
-    </div>
+export function CardBack({ size = 'md', className = '' }) {
+  const s = SIZES[size] || SIZES.md;
+  return (
+    <span
+      aria-hidden="true"
+      className={`relative block shrink-0 overflow-hidden border-2 border-amber-100/40 bg-[repeating-linear-gradient(45deg,#065f46_0px,#065f46_4px,#064e3b_4px,#064e3b_8px)] shadow-md ${s.box} ${className}`}
+    >
+      <span className="absolute inset-0 flex items-center justify-center text-amber-300/80">
+        <span className="rounded-full border border-amber-300/40 px-1 py-0.5 text-[8px] leading-none">♠</span>
+      </span>
+    </span>
   );
 }
