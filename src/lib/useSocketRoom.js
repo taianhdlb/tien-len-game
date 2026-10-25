@@ -6,8 +6,10 @@ import { useToast } from '../components/toast-context.js';
 /**
  * Owns the socket session for one game: join/leave, state broadcast, reconnect.
  * `stateEvent` is the server event that carries the room snapshot.
+ * `options.onSession` reports { joined, inGame, leave } so a parent shell can
+ * hand the seat over before swapping to another game mode.
  */
-export function useSocketRoom(game, stateEvent) {
+export function useSocketRoom(game, stateEvent, { onSession } = {}) {
   const socket = getSocket();
   const { notify } = useToast();
   const [myId] = useState(getPlayerId);
@@ -103,6 +105,11 @@ export function useSocketRoom(game, stateEvent) {
     setJoined(false);
     setRoom(null);
   }, [emit]);
+
+  const inGame = room?.status === 'PLAYING';
+  useEffect(() => {
+    onSession?.({ joined, inGame, leave });
+  }, [onSession, joined, inGame, leave]);
 
   return { socket, myId, room, setRoom, joined, connected, join, leave, emit };
 }

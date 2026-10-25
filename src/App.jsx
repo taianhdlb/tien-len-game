@@ -2,12 +2,12 @@ import { lazy, Suspense, useState } from 'react';
 
 const MonopolyGame = lazy(() => import('./games/monopoly/MonopolyGame.jsx'));
 const HorseGame = lazy(() => import('./games/horse/HorseGame.jsx'));
-const TienLenGame = lazy(() => import('./games/tienlen/TienLenGame.jsx'));
+const CardGames = lazy(() => import('./games/cards/CardGames.jsx'));
 
 const TABS = [
   { id: 'MONOPOLY', label: 'Cờ Tỷ Phú D&D', short: 'Monopoly', icon: '🏰' },
   { id: 'HORSE', label: 'Cờ Cá Ngựa', short: 'Cá Ngựa', icon: '🐴' },
-  { id: 'TIEN_LEN', label: 'Tiến Lên Online', short: 'Tiến Lên', icon: '🃏' }
+  { id: 'CARDS', label: 'Đánh Bài Online', short: 'Đánh Bài', icon: '🃏' }
 ];
 
 function Loading() {
@@ -61,7 +61,7 @@ export default function App() {
 
       <main className="relative min-h-0 flex-1">
         <Suspense fallback={<Loading />}>
-          {game === 'MONOPOLY' ? <MonopolyGame /> : game === 'HORSE' ? <HorseGame /> : <TienLenGame />}
+          {game === 'MONOPOLY' ? <MonopolyGame /> : game === 'HORSE' ? <HorseGame /> : <CardGames />}
         </Suspense>
       </main>
     </div>

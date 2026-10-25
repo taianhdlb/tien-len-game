@@ -209,8 +209,8 @@ function WaitingRoom({ room, myId, mode, setMode, onStart, onCopy }) {
   );
 }
 
-export default function TienLenGame() {
-  const { myId, room, joined, connected, join, leave, emit } = useSocketRoom('tienlen', 'tienlen:state');
+export default function TienLenGame({ onSession }) {
+  const { myId, room, joined, connected, join, leave, emit } = useSocketRoom('tienlen', 'tienlen:state', { onSession });
   const { notify } = useToast();
   const [selection, setSelection] = useState({ turn: -1, ids: [] });
   const [mode, setMode] = useState('TLMN');
