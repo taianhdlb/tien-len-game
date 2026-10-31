@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { COLORS, COLOR_ORDER, HOME_SLOTS, TRACK, cellCenter, homeSlot, horsePoint, trackIndex, yardSlot } from './board.js';
 import { HOME_FACES, isSatNut } from './engine.js';
-import { pieceSnapshot } from '../../three/scenes.js';
+import { boardTokenSnapshot } from '../../three/scenes.js';
 
 const TRACK_DECOR = TRACK.map((cell, index) => {
   const start = COLOR_ORDER.find((id) => COLORS[id].start === index) ?? null;
@@ -27,7 +27,7 @@ export default function HorseBoard({ room, myId, isMyTurn, selectedHorse, onSele
   const horseImages = useMemo(
     () =>
       Object.fromEntries(
-        COLOR_ORDER.map((id) => [id, pieceSnapshot('horse', COLORS[id].hex, 192)])
+        COLOR_ORDER.map((id) => [id, boardTokenSnapshot('horse', COLORS[id].hex, 192)])
       ),
     []
   );
@@ -420,7 +420,7 @@ export default function HorseBoard({ room, myId, isMyTurn, selectedHorse, onSele
               type="button"
               onClick={() => handleHorseClick(horse)}
               disabled={!isMyTurn || !movable}
-              className={`absolute z-30 aspect-square w-[8.8%] -translate-x-1/2 -translate-y-1/2 ${
+              className={`absolute z-30 aspect-square w-[7%] -translate-x-1/2 -translate-y-1/2 ${
                 isMyTurn && movable ? 'cursor-pointer' : 'cursor-default'
               } ${selected ? 'z-50' : ''}`}
               style={{ left: x, top: y, transform: `translate(-50%, -50%) scale(${scale})` }}
@@ -444,22 +444,22 @@ export default function HorseBoard({ room, myId, isMyTurn, selectedHorse, onSele
                 <span className="relative flex h-full w-full items-center justify-center text-[clamp(14px,2.5cqw,26px)]">🐴</span>
               )}
               <span
-                className="absolute -bottom-0.5 left-1/2 flex h-[28%] min-h-3 -translate-x-1/2 items-center justify-center rounded-full border px-1 text-[clamp(6px,0.8cqw,9px)] font-black shadow"
+                className="absolute bottom-0 left-1/2 flex h-[26%] min-h-3 -translate-x-1/2 items-center justify-center rounded-full border px-1 text-[clamp(6px,0.8cqw,9px)] font-black shadow"
                 style={{ background: color.dark, borderColor: color.light, color: '#fff' }}
               >
                 {horseIndex + 1}
               </span>
               {stacked > 1 && (
-                <span className="absolute -right-0.5 -top-0.5 flex h-[30%] min-h-3 min-w-3 items-center justify-center rounded-full bg-stone-950/90 px-0.5 text-[clamp(6px,0.7cqw,9px)] font-black text-amber-300 ring-1 ring-amber-500/60">
+                <span className="absolute right-0 top-0 flex h-[30%] min-h-3 min-w-3 items-center justify-center rounded-full bg-stone-950/90 px-0.5 text-[clamp(6px,0.7cqw,9px)] font-black text-amber-300 ring-1 ring-amber-500/60">
                   {stacked}
                 </span>
               )}
               {isMyHorse && horse.status === 'HOME' && (
-                <span className="absolute -left-0.5 -top-0.5 text-[clamp(7px,1cqw,11px)]">⭐</span>
+                <span className="absolute left-0 top-0 text-[clamp(7px,1cqw,11px)]">⭐</span>
               )}
               {isSatNut(room, player, horse) && (
                 <span
-                  className="absolute -right-1 bottom-0 rounded-full bg-stone-950/90 px-1 text-[clamp(6px,0.75cqw,9px)] font-black text-amber-300 ring-1 ring-amber-500/70"
+                  className="absolute right-0 top-[38%] rounded-full bg-stone-950/90 px-1 text-[clamp(6px,0.75cqw,9px)] font-black text-amber-300 ring-1 ring-amber-500/70"
                   title="Sát nút: quân đối thủ đứng ngay ô trước mặt"
                 >
                   SÁT

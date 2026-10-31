@@ -57,7 +57,7 @@ function Results({ room, myId, isHost, onStart, onDismiss }) {
             {room.results?.type === 'WIN' ? 'Ù tuyệt đối' : 'Hết 4 vòng · tính điểm rác'}
           </p>
           <h2 className="font-display mt-0.5 text-2xl font-bold text-amber-300">
-            {winner ? `${winner.name} thắng chiếu` : 'Chiếu đã kết thúc'}
+            {winner ? `${winner.name} về nhất` : 'Chiếu đã kết thúc'}
           </h2>
           {den && (
             <p className="mt-1 text-[11px] font-bold text-rose-300">

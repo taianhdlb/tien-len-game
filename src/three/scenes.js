@@ -45,6 +45,25 @@ export function pieceSnapshot(classId, hexColor, px) {
   });
 }
 
+// Board tokens are viewed from a high angle so the figurine's base — the point that must
+// line up with a board cell — sits at the centre of the sprite instead of near its bottom edge.
+export function boardTokenSnapshot(classId, hexColor, px) {
+  return cached(`token:${classId}:${hexColor}:${px}`, () => {
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 50);
+    camera.position.set(0, 3.6, 1.9);
+    camera.lookAt(0, 0.45, 0);
+    addStudioLights(scene);
+    scene.add(createShadow(1.5));
+    const model = buildPieceModel(classId, hexColor);
+    model.rotation.y = -0.35;
+    scene.add(model);
+    const url = snapshot(scene, camera, px, px);
+    disposeHierarchy(scene);
+    return url;
+  });
+}
+
 export function buildingSnapshot(tier, hexColor, px) {
   return cached(`building:${tier}:${hexColor}:${px}`, () => {
     const scene = new THREE.Scene();

@@ -101,7 +101,7 @@ export default function CardGames() {
             <h2 className="font-display text-lg font-bold text-amber-300">Rời chiếu {active?.label}?</h2>
             <p className="mt-1 text-xs leading-relaxed text-stone-300">
               Bạn đang ngồi ở phòng <span className="font-bold text-emerald-300">{active?.label}</span>.
-              {session.inGame ? ' Ván đang đi sẽ tan và ghế của bạn bị bỏ trống.' : ' Chiếu này sẽ đóng nếu không còn ai ngồi.'} Chuyển sang{' '}
+              {session.inGame ? ' Ván đang chơi sẽ bị huỷ và ghế của bạn bị bỏ trống.' : ' Chiếu này sẽ đóng nếu không còn ai ngồi.'} Chuyển sang{' '}
               <span className="font-bold text-amber-200">{target.label}</span> để mở chiếu mới.
             </p>
             <div className="mt-4 flex gap-2">

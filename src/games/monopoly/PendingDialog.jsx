@@ -7,7 +7,7 @@ const OUTCOME = {
   CRIT_SUCCESS: { title: 'ĐỎ NHƯ SON (20)!', icon: '🧧', tone: 'text-amber-300', ring: 'border-amber-400/70 bg-amber-950/50' },
   SUCCESS: { title: 'THÀNH CÔNG', icon: '🎉', tone: 'text-emerald-300', ring: 'border-emerald-500/60 bg-emerald-950/40' },
   FAIL: { title: 'THẤT BẠI', icon: '💥', tone: 'text-rose-300', ring: 'border-rose-500/60 bg-rose-950/40' },
-  CRIT_FAIL: { title: 'ĐEN PHỦI (1)!', icon: '🪦', tone: 'text-rose-400', ring: 'border-rose-500/70 bg-rose-950/60' }
+  CRIT_FAIL: { title: 'ĐEN ĐỦI (1)!', icon: '🪦', tone: 'text-rose-400', ring: 'border-rose-500/70 bg-rose-950/60' }
 };
 
 const TONE = {
@@ -43,7 +43,7 @@ function buildView(room, pending) {
       title: tile.name,
       speaker: relic ? 'Sở Du Lịch' : 'Chủ Đất',
       text: relic
-        ? 'Một Kỳ Quan nằm trong bộ ba di sản. Sưu đủ 3 Kỳ Quan là thắng tuyệt đối!'
+        ? 'Một Kỳ Quan nằm trong bộ ba di sản. Sưu tập đủ 3 Kỳ Quan là thắng tuyệt đối!'
         : 'Mảnh đất này chưa có chủ, ngân hàng sẵn sàng sang tên nếu bạn đủ tiền.',
       meta: [
         `Giá đất: ${tile.price}g`,
@@ -287,8 +287,8 @@ function buildView(room, pending) {
       eyebrow: 'Lệnh Bắt Giữ',
       title: 'Về Tạm Giam!',
       speaker: 'Công An Phường',
-      text: 'Bạn bị bắt tại chỗ vì vi phạm nội lệ và phải về ngay phòng tạm giam.',
-      meta: ['Không được đòi hỏi', 'Mất lượt hiện tại'],
+      text: 'Bạn bị bắt tại chỗ vì vi phạm nội quy và phải về ngay phòng tạm giam.',
+      meta: ['Không được khiếu nại', 'Mất lượt hiện tại'],
       actions: [{ label: 'Chấp nhận', action: { type: 'CONTINUE' }, tone: 'danger' }]
     };
   }

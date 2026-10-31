@@ -306,7 +306,7 @@ function startGame(s, playerId, rng) {
   s.winnerId = null;
   s.winReason = null;
   log(s, `Ván cờ bắt đầu! Mỗi người chơi được phát ${STARTING_GOLD}g vốn làm ăn.`, 'gold');
-  log(s, `Giới hạn ${MAX_ROUNDS} vòng: hết vòng, người sưu được nhiều Kỳ Quan rồi đến tổng tài sản cao nhất sẽ thắng.`, 'muted');
+  log(s, `Giới hạn ${MAX_ROUNDS} vòng: hết vòng, người sưu tập được nhiều Kỳ Quan rồi đến tổng tài sản cao nhất sẽ thắng.`, 'muted');
 }
 
 // Pure reducer: returns the next room state or throws GameError. `rng` is injectable for deterministic tests.

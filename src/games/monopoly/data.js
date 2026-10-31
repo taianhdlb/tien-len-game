@@ -138,7 +138,7 @@ export const EVENTS = [
   },
   {
     id: 2,
-    speaker: 'Bố Số Đầu Ngõ',
+    speaker: 'Chủ Đề Đầu Ngõ',
     title: 'Canh Bạc Lô Đề',
     desc: 'Chiếu lô ngoài quán nước đang lên cơn, một ván ăn cả ngã về không.',
     safeLabel: 'Lắc đầu bỏ đi',
@@ -148,11 +148,11 @@ export const EVENTS = [
     passText: 'Trúng độc đắc! Bạn ẵm 150g tiền thắng.',
     passGold: 150,
     failCost: 60,
-    failText: 'Trượt tép, mất 60g cho đám lô đề.'
+    failText: 'Trật lất, mất 60g cho đám lô đề.'
   },
   {
     id: 3,
-    speaker: 'Headteam Bán Hàng Online',
+    speaker: 'Trưởng Nhóm Bán Hàng Online',
     title: 'Cơn Sốt Hàng Xách Tay',
     desc: 'Kèo sale sập sàn rủ bạn ôm một lô hàng về bán dịp Tết.',
     safeLabel: 'Rút vốn 50g',
@@ -231,7 +231,7 @@ export const BLESSINGS = [
     id: 3,
     god: 'Bà Chúa Xứ',
     title: 'Cầu Tại Miếu Bà',
-    desc: 'Lễ hội vía Bà Chúa Xứ, ai tin thành tâm thì cầu được thấy.',
+    desc: 'Lễ hội vía Bà Chúa Xứ, ai tin thành tâm thì cầu được ước thấy.',
     dc: 11,
     passGold: 140,
     failCost: 40

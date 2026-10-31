@@ -57,7 +57,7 @@ export function useSocketRoom(game, stateEvent, { onSession } = {}) {
       serverRoomRef.current = null;
       setJoined(false);
       setRoom(null);
-      notify('Tài khoản này vừa được mở ở một tab khác.', 'error');
+      notify('Phiên chơi này vừa được mở ở một tab khác.', 'error');
     };
 
     socket.on(stateEvent, onState);
