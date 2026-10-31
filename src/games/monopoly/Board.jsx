@@ -13,13 +13,6 @@ import { BuildingImage, PieceImage } from '../../three/Piece3D.jsx';
 import CenterPanel from './CenterPanel.jsx';
 import { usePawnPositions } from './usePawnPositions.js';
 
-const EDGE_BADGE = {
-  bottom: '-top-2 left-1/2 -translate-x-1/2',
-  top: '-bottom-2 left-1/2 -translate-x-1/2',
-  left: '-right-2 top-1/2 -translate-y-1/2',
-  right: '-left-2 top-1/2 -translate-y-1/2'
-};
-
 function Tile({ tile, room, boardSize, onInspect }) {
   const { row, col, edge } = getTileGridArea(tile.id);
   const corner = isCorner(tile.id);
@@ -42,23 +35,13 @@ function Tile({ tile, room, boardSize, onInspect }) {
       style={{
         gridRow: row,
         gridColumn: col,
-        backgroundColor: corner ? '#1c1917' : '#0c0a09'
+        backgroundColor: corner ? '#1c1917' : '#0c0a09',
+        borderColor: ownerColor || (corner ? '#92400eb3' : '#44403c80'),
+        boxShadow: ownerColor ? `inset 0 0 0 1px ${ownerColor}59` : undefined
       }}
-      className={`group relative flex min-h-0 min-w-0 flex-col items-center justify-between overflow-visible rounded-[3px] border p-[2px] transition hover:z-20 hover:brightness-125 focus:z-20 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400 ${
-        corner ? 'border-amber-800/70' : 'border-stone-700/50'
-      }`}
+      className="group relative flex min-h-0 min-w-0 flex-col items-center justify-between overflow-visible rounded-[3px] border p-[2px] transition hover:z-20 hover:brightness-125 focus:z-20 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
       aria-label={`${tile.name}${costLabel ? `, ${costAria}` : ''}`}
     >
-      {owner && (
-        <span
-          className={`pointer-events-none absolute z-30 flex max-w-[9cqw] items-center gap-[2px] truncate rounded-full border bg-stone-950/95 px-1 py-[1px] shadow-xl ${EDGE_BADGE[edge]}`}
-          style={{ borderColor: ownerColor, color: ownerColor, fontSize: 'clamp(5px, 0.92cqw, 8.5px)' }}
-        >
-          <span className="h-1 w-1 shrink-0 rounded-full" style={{ backgroundColor: ownerColor }} />
-          <span className="truncate font-black">{owner.name}</span>
-        </span>
-      )}
-
       {!corner && (
         <span
           className={`w-full shrink-0 rounded-full shadow-inner ${edge === 'top' ? 'order-3 mt-[1px]' : 'order-1 mb-[1px]'}`}
@@ -142,8 +125,8 @@ export default function Board({ room, myId, isMyTurn, onInspect, onDispatch }) {
   }, []);
 
   const size = metrics.size || 560;
-  const pawnPx = Math.round(Math.max(18, Math.min(40, size * 0.058)));
-  const spread = Math.max(5, Math.min(12, size * 0.017));
+  const pawnPx = Math.round(Math.max(24, Math.min(54, size * 0.078)));
+  const spread = Math.max(9, Math.min(20, size * 0.026));
 
   const pawns =
     metrics.centers.length === 0
@@ -163,7 +146,8 @@ export default function Board({ room, myId, isMyTurn, onInspect, onDispatch }) {
               pos,
               x: center.x + (slot - (mates.length - 1) / 2) * spread,
               y: center.y,
-              active: player.id === currentId
+              active: player.id === currentId,
+              moving: pos !== (player.position || 0)
             };
           })
           .filter(Boolean);
@@ -194,30 +178,47 @@ export default function Board({ room, myId, isMyTurn, onInspect, onDispatch }) {
       </div>
 
       <div className="pointer-events-none absolute inset-0 z-30 overflow-visible">
-        {pawns.map(({ player: p, x, y, active }) => {
+        {pawns.map(({ player: p, x, y, active, moving }) => {
           const cls = getClass(p.classId);
+          const ring = hexToCss(cls.hex);
+          const lit = active || moving;
           return (
             <div
               key={p.id}
-              className="absolute left-0 top-0 transition-transform duration-150 ease-linear will-change-transform"
-              style={{ transform: `translate3d(${x}px, ${y}px, 0)` }}
+              className="absolute left-0 top-0 transition-transform duration-[150ms] ease-linear will-change-transform"
+              style={{ transform: `translate3d(${x}px, ${y}px, 0)`, zIndex: lit ? 40 : 30 }}
             >
-              <div className="relative -translate-x-1/2 -translate-y-[62%]">
-                {active && (
-                  <span className="absolute inset-x-1 bottom-0 h-2 rounded-full bg-amber-400/50 blur-[3px] anim-glow" />
+              <div
+                className={`relative -translate-x-1/2 -translate-y-[62%] transition-transform duration-[150ms] ${lit ? 'scale-[1.18]' : ''}`}
+              >
+                {lit && (
+                  <span
+                    className="anim-glow absolute inset-x-0 -bottom-1 h-2.5 rounded-full blur-[4px]"
+                    style={{ backgroundColor: ring }}
+                  />
                 )}
-                <PieceImage
-                  classId={p.classId}
-                  hexColor={cls.hex}
-                  size={pawnPx}
-                  alt={p.name}
-                  className={active ? 'drop-shadow-[0_0_9px_rgba(245,158,11,0.95)]' : 'opacity-95'}
-                />
+                <span
+                  className="flex items-center justify-center rounded-full border-2 shadow-[0_4px_10px_rgba(0,0,0,0.85)]"
+                  style={{
+                    width: pawnPx + 10,
+                    height: pawnPx + 10,
+                    borderColor: ring,
+                    background: `radial-gradient(circle, ${ring}33 0%, rgba(12,10,9,0.9) 65%)`
+                  }}
+                >
+                  <PieceImage
+                    classId={p.classId}
+                    hexColor={cls.hex}
+                    size={pawnPx}
+                    alt={p.name}
+                    className={lit ? 'drop-shadow-[0_0_10px_rgba(245,158,11,0.95)]' : ''}
+                  />
+                </span>
                 {p.inJail && (
                   <span
                     aria-hidden="true"
                     className="absolute -right-1 -top-1 text-[10px] leading-none"
-                    style={{ fontSize: Math.max(8, pawnPx * 0.36) }}
+                    style={{ fontSize: Math.max(9, pawnPx * 0.36) }}
                   >
                     ⛓️
                   </span>

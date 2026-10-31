@@ -1,4 +1,3 @@
-export const BOARD_COLUMNS = 11;
 export const CORNER_IDS = new Set([0, 10, 20, 30]);
 
 // 11x11 CSS grid: corners take 1.45fr, edge tiles 1fr.

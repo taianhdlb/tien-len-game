@@ -19,6 +19,9 @@ export function useSocketRoom(game, stateEvent, { onSession } = {}) {
   const joinedRef = useRef(false);
   const targetRoomRef = useRef(null);
   const lastJoinRef = useRef(null);
+  // The last snapshot the server actually accepted. Optimistic local edits never touch it,
+  // so a rejected submit can be replayed against real server state instead of being lost.
+  const serverRoomRef = useRef(null);
 
   // Reading socket.connected through an external store avoids missing a connect
   // that fires between render and the first effect subscription.
@@ -41,6 +44,7 @@ export function useSocketRoom(game, stateEvent, { onSession } = {}) {
   useEffect(() => {
     const onState = (next) => {
       if (!next || (targetRoomRef.current && next.id !== targetRoomRef.current)) return;
+      serverRoomRef.current = next;
       setRoom(next);
     };
     const onConnect = () => {
@@ -50,6 +54,7 @@ export function useSocketRoom(game, stateEvent, { onSession } = {}) {
     };
     const onReplaced = () => {
       joinedRef.current = false;
+      serverRoomRef.current = null;
       setJoined(false);
       setRoom(null);
       notify('Tài khoản này vừa được mở ở một tab khác.', 'error');
@@ -70,15 +75,17 @@ export function useSocketRoom(game, stateEvent, { onSession } = {}) {
   }, [socket, game, stateEvent, notify]);
 
   const emit = useCallback(
-    (event, payload) =>
+    (event, payload, { silent = false } = {}) =>
       new Promise((resolve) => {
         socket.emit(event, payload, (res) => {
-          if (res && res.ok === false) notify(res.error || 'Không thể thực hiện thao tác.', 'error');
+          if (res && res.ok === false && !silent) notify(res.error || 'Không thể thực hiện thao tác.', 'error');
           resolve(res);
         });
       }),
     [socket, notify]
   );
+
+  const getServerRoom = useCallback(() => serverRoomRef.current, []);
 
   const join = useCallback(
     async (payload) => {
@@ -101,6 +108,7 @@ export function useSocketRoom(game, stateEvent, { onSession } = {}) {
     joinedRef.current = false;
     lastJoinRef.current = null;
     targetRoomRef.current = null;
+    serverRoomRef.current = null;
     await emit('room:leave');
     setJoined(false);
     setRoom(null);
@@ -111,5 +119,5 @@ export function useSocketRoom(game, stateEvent, { onSession } = {}) {
     onSession?.({ joined, inGame, leave });
   }, [onSession, joined, inGame, leave]);
 
-  return { socket, myId, room, setRoom, joined, connected, join, leave, emit };
+  return { socket, myId, room, setRoom, joined, connected, join, leave, emit, getServerRoom };
 }

@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { COLORS, COLOR_ORDER, TRACK, cellCenter, homeSlot, horsePoint, trackIndex, yardSlot } from './board.js';
+import { COLORS, COLOR_ORDER, HOME_SLOTS, TRACK, cellCenter, homeSlot, horsePoint, trackIndex, yardSlot } from './board.js';
+import { HOME_FACES, isSatNut } from './engine.js';
 import { pieceSnapshot } from '../../three/scenes.js';
 
 const TRACK_DECOR = TRACK.map((cell, index) => {
@@ -224,6 +225,9 @@ export default function HorseBoard({ room, myId, isMyTurn, selectedHorse, onSele
                 {color.lane.map((cell, step) => {
                   const x = cell.col + 0.055;
                   const y = cell.row + 0.055;
+                  const filled = (room.players.find((p) => p.color === id)?.horses || []).some(
+                    (horse) => horse.status === 'HOME' && horse.pos === step + 1
+                  );
                   return (
                     <g key={`${id}-${step}`}>
                       <rect
@@ -245,11 +249,11 @@ export default function HorseBoard({ room, myId, isMyTurn, selectedHorse, onSele
                         fontSize="0.32"
                         fontWeight="800"
                         fill={darkInk(id)}
-                        opacity="0.92"
+                        opacity={filled ? 0.35 : 0.92}
                       >
-                        {step + 1}
+                        {HOME_FACES[step]}
                       </text>
-                      {step === 5 && (
+                      {step === HOME_SLOTS - 1 && (
                         <circle
                           cx={cell.col + 0.5}
                           cy={cell.row + 0.5}
@@ -389,7 +393,7 @@ export default function HorseBoard({ room, myId, isMyTurn, selectedHorse, onSele
               entry.captures > 0
                 ? `Đi tới và đá ${entry.captures} quân đối thủ`
                 : entry.target.status === 'HOME'
-                  ? `Lên bậc ${entry.target.pos}`
+                  ? `Vào chuồng bậc ${entry.target.pos}`
                   : `Đi tới ô đích`
             }
             title={entry.count > 1 ? `${entry.count} quân có thể tới ô này` : undefined}
@@ -450,8 +454,16 @@ export default function HorseBoard({ room, myId, isMyTurn, selectedHorse, onSele
                   {stacked}
                 </span>
               )}
-              {isMyHorse && horse.status === 'HOME' && horse.pos >= 3 && (
+              {isMyHorse && horse.status === 'HOME' && (
                 <span className="absolute -left-0.5 -top-0.5 text-[clamp(7px,1cqw,11px)]">⭐</span>
+              )}
+              {isSatNut(room, player, horse) && (
+                <span
+                  className="absolute -right-1 bottom-0 rounded-full bg-stone-950/90 px-1 text-[clamp(6px,0.75cqw,9px)] font-black text-amber-300 ring-1 ring-amber-500/70"
+                  title="Sát nút: quân đối thủ đứng ngay ô trước mặt"
+                >
+                  SÁT
+                </span>
               )}
               {movable && (
                 <span

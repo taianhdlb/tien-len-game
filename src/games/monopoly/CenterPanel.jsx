@@ -39,7 +39,7 @@ export default function CenterPanel({ room, myId, isMyTurn, boardSize, onDispatc
     return (
       <div className="flex h-full w-full flex-col items-center justify-center gap-[2%] text-center">
         <h2 className="font-display font-bold text-amber-400" style={{ fontSize: 'clamp(12px, 2.6cqw, 26px)' }}>
-          Đang Tập Hợp Tổ Đội
+          Đang Tập Hợp Người Chơi
         </h2>
         <p className="text-stone-400" style={T.tiny}>
           Chia sẻ mã phòng để bạn bè cùng tham gia
@@ -73,11 +73,11 @@ export default function CenterPanel({ room, myId, isMyTurn, boardSize, onDispatc
               className="rounded-lg bg-emerald-700 px-4 py-1.5 font-black text-white shadow-[0_0_18px_rgba(4,120,87,0.65)] transition hover:scale-105 hover:bg-emerald-600"
               style={T.button}
             >
-              ⚔️ Bắt Đầu Cuộc Chinh Phạt
+              🎲 Bắt Đầu Ván Cờ
             </button>
           ) : (
             <p className="animate-pulse text-stone-500 italic" style={T.tiny}>
-              Cần ít nhất 2 chiến binh ({ready.length}/4)…
+              Cần ít nhất 2 người chơi ({ready.length}/4)…
             </p>
           )
         ) : (
@@ -98,21 +98,21 @@ export default function CenterPanel({ room, myId, isMyTurn, boardSize, onDispatc
           👑
         </span>
         <h2 className="font-display font-black text-amber-400" style={{ fontSize: 'clamp(13px, 2.8cqw, 30px)' }}>
-          {winner ? `${winner.name} Chiến Thắng!` : 'Ván Đấu Kết Thúc'}
+          {winner ? `${winner.name} Là Tỷ Phú!` : 'Ván Đấu Kết Thúc'}
         </h2>
         <p className="max-w-[85%] text-stone-300" style={T.tiny}>
           {room.winReason === 'RELICS'
-            ? 'Thu thập đủ 3 Thánh Vật quyền năng và thống trị vương quốc!'
+            ? 'Sưu tập đủ 3 Kỳ Quan Việt Nam và thắng tuyệt đối!'
             : room.winReason === 'TIME'
-              ? `Hết ${MAX_ROUNDS} vòng chinh phạt — người nhiều Thánh Vật và tài sản nhất lên ngôi!`
+              ? `Hết ${MAX_ROUNDS} vòng: người nhiều Kỳ Quan rồi đến tổng tài sản cao nhất lên ngôi tỷ phú!`
               : winner
-                ? 'Là chiến binh cuối cùng trụ vững trên bàn cờ.'
-                : 'Không còn chiến binh nào trên bàn cờ.'}
+                ? 'Là người chơi cuối cùng chưa phá sản.'
+                : 'Không còn ai trụ lại trên bàn cờ.'}
         </p>
         {winner && (
           <div className="flex items-center gap-1.5 rounded-full border border-amber-700/50 bg-stone-900/90 px-2 py-0.5" style={T.tiny}>
             <PieceImage classId={winner.classId} hexColor={getClass(winner.classId).hex} size={Math.round(diceSize * 0.5)} />
-            <span className="text-amber-300">{mine ? 'Bạn đã chinh phục vương quốc!' : `${winner.name} đăng quang.`}</span>
+            <span className="text-amber-300">{mine ? 'Bạn là tỷ phú ván này!' : `${winner.name} đăng quang tỷ phú.`}</span>
           </div>
         )}
         {isHost ? (
@@ -155,7 +155,7 @@ export default function CenterPanel({ room, myId, isMyTurn, boardSize, onDispatc
         style={T.tiny}
       >
         {room.pending
-          ? 'Sự kiện đang chờ xử lý…'
+          ? 'Đang chờ quyết định…'
           : `Điểm: ${room.dice?.[0] ?? 0} + ${room.dice?.[1] ?? 0} = ${(room.dice?.[0] ?? 0) + (room.dice?.[1] ?? 0)}`}
       </div>
 
@@ -172,7 +172,7 @@ export default function CenterPanel({ room, myId, isMyTurn, boardSize, onDispatc
       ) : (
         <p className="animate-pulse text-stone-400" style={T.tiny}>
           {current && current.connected === false
-            ? 'Chiến binh mất kết nối — đang chờ bỏ qua lượt…'
+            ? 'Người chơi mất kết nối — đang chờ bỏ qua lượt…'
             : `Chờ ${current?.name || 'đối thủ'} thao tác…`}
         </p>
       )}

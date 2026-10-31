@@ -1,12 +1,13 @@
 import { BLESSINGS, BOARD_TILES, EVENTS, INSTANT_WIN_RELIC_IDS, getClass } from './data.js';
-import { JAIL_BAIL, JAIL_DC, TIER_NAMES, getUpgradeCost, isSuccess } from './engine.js';import { Dice3D } from '../../three/Dice3D.jsx';
+import { JAIL_BAIL, JAIL_DC, TIER_NAMES, getUpgradeCost, isSuccess } from './engine.js';
+import { Dice3D } from '../../three/Dice3D.jsx';
 import { FantasyIcon } from '../../components/Monopoly/FantasyIcons.jsx';
 
 const OUTCOME = {
-  CRIT_SUCCESS: { title: 'ĐÒN CHÍ MẠNG (NAT 20)!', icon: '👑', tone: 'text-amber-300', ring: 'border-amber-400/70 bg-amber-950/50' },
+  CRIT_SUCCESS: { title: 'ĐỎ NHƯ SON (20)!', icon: '🧧', tone: 'text-amber-300', ring: 'border-amber-400/70 bg-amber-950/50' },
   SUCCESS: { title: 'THÀNH CÔNG', icon: '🎉', tone: 'text-emerald-300', ring: 'border-emerald-500/60 bg-emerald-950/40' },
   FAIL: { title: 'THẤT BẠI', icon: '💥', tone: 'text-rose-300', ring: 'border-rose-500/60 bg-rose-950/40' },
-  CRIT_FAIL: { title: 'THẢM HỌA (NAT 1)!', icon: '💀', tone: 'text-rose-400', ring: 'border-rose-500/70 bg-rose-950/60' }
+  CRIT_FAIL: { title: 'ĐEN PHỦI (1)!', icon: '🪦', tone: 'text-rose-400', ring: 'border-rose-500/70 bg-rose-950/60' }
 };
 
 const TONE = {
@@ -38,16 +39,16 @@ function buildView(room, pending) {
     return {
       ...base,
       icon: tile.iconKey,
-      eyebrow: relic ? 'Thánh Vật Cổ Đại' : 'Thương Vụ Lãnh Địa',
+      eyebrow: relic ? 'Kỳ Quan Việt Nam' : 'Đất Chính Chủ Đang Bán',
       title: tile.name,
-      speaker: relic ? 'Người Giữ Kho Báu' : 'Thương Nhân Vương Quốc',
-      text:
-        tile.desc ||
-        'Vùng đất chưa có chủ nhân. Kim khố vương quốc sẵn sàng nhượng lại nếu bạn đủ vàng.',
+      speaker: relic ? 'Sở Du Lịch' : 'Chủ Đất',
+      text: relic
+        ? 'Một Kỳ Quan nằm trong bộ ba di sản. Sưu đủ 3 Kỳ Quan là thắng tuyệt đối!'
+        : 'Mảnh đất này chưa có chủ, ngân hàng sẵn sàng sang tên nếu bạn đủ tiền.',
       meta: [
-        `Giá mua: ${tile.price}g`,
+        `Giá đất: ${tile.price}g`,
         `Thuê gốc: ${tile.rents?.[0] ?? 0}g`,
-        `Nâng cấp: ${getUpgradeCost(tile)}g`
+        `Xây dựng: ${getUpgradeCost(tile)}g`
       ],
       actions: [
         {
@@ -71,10 +72,10 @@ function buildView(room, pending) {
     return {
       ...base,
       icon: 'relic',
-      eyebrow: 'Xây Dựng Lãnh Địa',
+      eyebrow: 'Xây Dựng Nhà Cửa',
       title: tile.name,
-      speaker: 'Kiến Trúc Sư Hoàng Gia',
-      text: `Công trình ${TIER_NAMES[level]} đã sẵn sàng mở rộng thành ${TIER_NAMES[next]}.`,
+      speaker: 'Thầu Xây Địa Phương',
+      text: `Lô đất đang là ${TIER_NAMES[level]}, xây lên ${TIER_NAMES[next]} thì tiền thuê sẽ nhảy vọt.`,
       meta: [`Hiện tại: ${TIER_NAMES[level]}`, `Chi phí: ${cost}g`, `Thuê mới: ${tile.rents?.[next] ?? 0}g`],
       actions: [
         {
@@ -97,23 +98,23 @@ function buildView(room, pending) {
     return {
       ...base,
       icon: tile.iconKey,
-      eyebrow: relicBuyout ? 'Thánh Vật Có Chủ' : 'Lãnh Địa Có Chủ',
-      title: relicBuyout ? `Thánh Vật · ${tile.name}` : `Thuế Đất · ${tile.name}`,
-      speaker: owner?.name || 'Chủ lãnh địa',
+      eyebrow: relicBuyout ? 'Kỳ Quan Có Chủ' : 'Đất Có Chủ',
+      title: relicBuyout ? `Kỳ Quan · ${tile.name}` : `Tiền Thuê · ${tile.name}`,
+      speaker: owner?.name || 'Chủ đất',
       text: relicBuyout
-        ? `${owner?.name || 'Đối thủ'} đang giữ ${tile.name}. Trả thuê để đi tiếp, hoặc trả giá cao hơn để chuộc lại Thánh Vật.`
-        : `Bạn đặt chân vào lãnh địa của ${owner?.name || 'đối thủ'}. Hãy thanh toán tiền thuê để tiếp tục hành trình.`,
+        ? `${owner?.name || 'Đối thủ'} đang sở hữu ${tile.name}. Trả thuê để đi tiếp, hoặc trả giá cao hơn để chuộc lại Kỳ Quan.`
+        : `Bạn đặt chân vào đất của ${owner?.name || 'đối thủ'}. Trả tiền thuê rồi đi tiếp.`,
       meta: [
         `Phải trả: ${pending.amount}g`,
-        `Vàng của bạn: ${gold}g`,
-        ...(relicBuyout ? [`Chuộc Thánh Vật: ${relicBuyout}g`] : []),
+        `Tiền của bạn: ${gold}g`,
+        ...(relicBuyout ? [`Chuộc Kỳ Quan: ${relicBuyout}g`] : []),
         ...(broke ? ['⚠️ Sẽ phá sản!'] : [])
       ],
       actions: [
         ...(relicBuyout
           ? [
               {
-                label: `Chuộc Thánh Vật · ${relicBuyout}g`,
+                label: `Chuộc Kỳ Quan · ${relicBuyout}g`,
                 action: { type: 'BUY_RELIC' },
                 tone: 'primary',
                 disabled: gold < relicBuyout,
@@ -136,11 +137,11 @@ function buildView(room, pending) {
     return {
       ...base,
       icon: 'tax',
-      eyebrow: 'Sắc Lệnh Hoàng Gia',
+      eyebrow: 'Lệnh Thuế',
       title: tile.name,
-      speaker: 'Quan Thuế Vương Quốc',
-      text: tile.desc || 'Ngân khố vương quốc yêu cầu bạn đóng góp theo luật định.',
-      meta: [`Phải nộp: ${pending.amount}g`, `Vàng của bạn: ${gold}g`, ...(broke ? ['⚠️ Sẽ phá sản!'] : [])],
+      speaker: 'Cán Bộ Thuế',
+      text: 'Cơ quan thuế yêu cầu bạn đóng góp theo luật định, tính trên số tiền đang có.',
+      meta: [`Phải nộp: ${pending.amount}g`, `Tiền của bạn: ${gold}g`, ...(broke ? ['⚠️ Sẽ phá sản!'] : [])],
       actions: [{ label: `Nộp thuế · ${pending.amount}g`, action: { type: 'PAY' }, tone: broke ? 'danger' : 'primary' }]
     };
   }
@@ -152,7 +153,7 @@ function buildView(room, pending) {
       return {
         ...base,
         icon: 'event',
-        eyebrow: `Kiểm Định D20 · DC ${ev.dc}`,
+        eyebrow: `Cơ Hội · D20 DC ${ev.dc}`,
         title: ev.title,
         speaker: ev.speaker,
         meta: [],
@@ -163,7 +164,7 @@ function buildView(room, pending) {
     return {
       ...base,
       icon: 'event',
-      eyebrow: `Sự Kiện Ngẫu Nhiên · DC ${ev.dc}`,
+      eyebrow: `Ô Cơ Hội · DC ${ev.dc}`,
       title: ev.title,
       speaker: ev.speaker,
       text: ev.desc,
@@ -186,30 +187,32 @@ function buildView(room, pending) {
       return {
         ...base,
         icon: 'blessing',
-        eyebrow: `Thánh Lễ · ${bl.god}`,
+        eyebrow: `Khí Vận · ${bl.god}`,
         title: bl.title,
-        speaker: `Thần ${bl.god}`,
+        speaker: bl.god,
         meta: [],
         actions: [{ label: 'Tiếp tục', action: { type: 'CONTINUE' }, tone: 'primary' }],
         ...d20View(
           pending.d20.outcome,
           pending.d20.roll,
           bl.dc,
-          success ? `Thần ${bl.god} ban phước lành, nhận +${bl.passGold}g!` : `Không có phép màu nào. Bạn bị phạt ${bl.failCost}g.`
+          success
+            ? `${bl.god} linh ứng, bạn trúng lộc +${bl.passGold}g!`
+            : `Khí vận chưa tới, bạn tốn ${bl.failCost}g sắm lễ.`
         )
       };
     }
     return {
       ...base,
       icon: 'blessing',
-      eyebrow: `Điện Thờ · DC ${bl.dc}`,
+      eyebrow: `Ô Khí Vận · DC ${bl.dc}`,
       title: bl.title,
-      speaker: `Thần ${bl.god}`,
+      speaker: bl.god,
       text: bl.desc,
-      meta: [`Phước lành: +${bl.passGold}g`, `Thất bại: -${bl.failCost}g`],
+      meta: [`Trúng lộc: +${bl.passGold}g`, `Trượt: -${bl.failCost}g`],
       actions: [
         { label: 'Bỏ qua', action: { type: 'DECLINE' }, tone: 'ghost' },
-        { label: 'Cầu nguyện · D20', action: { type: 'ROLL_D20' }, tone: 'primary' }
+        { label: 'Khấn cầu · D20', action: { type: 'ROLL_D20' }, tone: 'primary' }
       ]
     };
   }
@@ -220,13 +223,13 @@ function buildView(room, pending) {
       return {
         ...base,
         icon: 'jail',
-        eyebrow: `Vượt Ngục · DC ${JAIL_DC}`,
-        title: 'Ngục Giam Tối',
-        speaker: 'Cai Ngục Sắt Đá',
+        eyebrow: `Xin Tại Ngoại · DC ${JAIL_DC}`,
+        title: 'Phòng Tạm Giam',
+        speaker: 'Công An Phường',
         meta: [],
         actions: [
           {
-            label: success ? 'Rời ngục & tung xúc xắc' : 'Chịu án',
+            label: success ? 'Về nhà & tung xúc xắc' : 'Chịu án',
             action: { type: 'CONTINUE' },
             tone: success ? 'primary' : 'ghost'
           }
@@ -236,28 +239,28 @@ function buildView(room, pending) {
           pending.d20.roll,
           JAIL_DC,
           success
-            ? 'Song sắt bật tung! Bạn thoát khỏi Ngục Giam và có thể tiếp tục hành trình.'
-            : 'Cố gắng thất bại. Bạn phải ở lại ngục thêm một lượt.'
+            ? 'Hồ sơ hợp lệ! Bạn được tại ngoại và đi tiếp.'
+            : 'Chưa được chấp nhận. Bạn phải ở lại thêm một lượt.'
         )
       };
     }
     return {
       ...base,
       icon: 'jail',
-      eyebrow: 'Ngục Giam Tối',
-      title: 'Bị Giam Giữ',
-      speaker: 'Cai Ngục Sắt Đá',
-      text: 'Bạn đang bị giam trong ngục tối. Nộp tiền bảo lãnh để bước ra ngay, hoặc liều mình vượt ngục bằng D20.',
-      meta: [`Bảo lãnh: ${JAIL_BAIL}g`, `Vượt ngục: D20 ≥ ${JAIL_DC}`],
+      eyebrow: 'Phòng Tạm Giam',
+      title: 'Đang Bị Tạm Giam',
+      speaker: 'Công An Phường',
+      text: 'Bạn đang bị tạm giam. Nộp tiền bảo lãnh để về ngay, hoặc làm đơn xin tại ngoại bằng D20.',
+      meta: [`Bảo lãnh: ${JAIL_BAIL}g`, `Tại ngoại: D20 ≥ ${JAIL_DC}`],
       actions: [
         {
           label: `Nộp bảo lãnh · ${JAIL_BAIL}g`,
           action: { type: 'PAY_BAIL' },
           tone: 'ghost',
           disabled: gold < JAIL_BAIL,
-          hint: gold < JAIL_BAIL ? 'Không đủ vàng' : null
+          hint: gold < JAIL_BAIL ? 'Không đủ tiền' : null
         },
-        { label: 'Vượt ngục · D20', action: { type: 'ROLL_D20' }, tone: 'primary' }
+        { label: 'Xin tại ngoại · D20', action: { type: 'ROLL_D20' }, tone: 'primary' }
       ]
     };
   }
@@ -268,12 +271,12 @@ function buildView(room, pending) {
     return {
       ...base,
       icon: 'teleport',
-      eyebrow: 'Cổng Không Gian',
+      eyebrow: 'Chuyến Bay',
       title: tile.name,
-      speaker: 'Pháp Sư Gác Cổng',
-      text: `Vòng xoáy ma pháp mở ra trước mắt, nối thẳng tới ${target.name}.`,
-      meta: [`Điểm đến: ${target.name}`, target.price > 0 ? `Giá đất: ${target.price}g` : 'Khu vực an toàn'],
-      actions: [{ label: 'Bước qua cổng', action: { type: 'CONTINUE' }, tone: 'primary' }]
+      speaker: 'Nhân Viên Mặt Đất',
+      text: `Chặng bay vừa khởi hành, bạn được chuyển thẳng ra ${target.name}.`,
+      meta: [`Điểm đến: ${target.name}`, target.price > 0 ? `Giá đất: ${target.price}g` : 'Ô an toàn'],
+      actions: [{ label: 'Lên máy bay', action: { type: 'CONTINUE' }, tone: 'primary' }]
     };
   }
 
@@ -282,10 +285,10 @@ function buildView(room, pending) {
       ...base,
       icon: 'jail',
       eyebrow: 'Lệnh Bắt Giữ',
-      title: 'Vào Ngục!',
-      speaker: 'Đội Vệ Binh',
-      text: 'Bạn bị bắt quả tang vi phạm luật lệ và bị áp giải ngay lập tức vào Ngục Giam.',
-      meta: ['Không thể trốn tránh', 'Mất lượt hiện tại'],
+      title: 'Về Tạm Giam!',
+      speaker: 'Công An Phường',
+      text: 'Bạn bị bắt tại chỗ vì vi phạm nội lệ và phải về ngay phòng tạm giam.',
+      meta: ['Không được đòi hỏi', 'Mất lượt hiện tại'],
       actions: [{ label: 'Chấp nhận', action: { type: 'CONTINUE' }, tone: 'danger' }]
     };
   }
@@ -331,7 +334,7 @@ export default function PendingDialog({ room, myId, isMyTurn, onDispatch }) {
           </div>
           {INSTANT_WIN_RELIC_IDS.includes(pending.tileId) && (
             <span className="shrink-0 rounded-full border border-amber-500/60 bg-amber-950/70 px-2 py-0.5 text-[9px] font-black tracking-wider text-amber-300 uppercase">
-              Thánh vật
+              Kỳ quan
             </span>
           )}
         </div>

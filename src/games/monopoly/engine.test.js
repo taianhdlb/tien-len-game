@@ -254,12 +254,12 @@ describe('jail', () => {
 describe('tax and rounds', () => {
   it('scales tax by current gold with min/max caps', () => {
     const tax4 = BOARD_TILES[4];
-    expect(getTaxAmount(tax4, 200)).toBe(20);
+    expect(getTaxAmount(tax4, 200)).toBe(50);
     expect(getTaxAmount(tax4, 500)).toBe(50);
-    expect(getTaxAmount(tax4, 5000)).toBe(80);
+    expect(getTaxAmount(tax4, 5000)).toBe(200);
     const tax38 = BOARD_TILES[38];
-    expect(getTaxAmount(tax38, 200)).toBe(30);
-    expect(getTaxAmount(tax38, 1000)).toBe(120);
+    expect(getTaxAmount(tax38, 200)).toBe(80);
+    expect(getTaxAmount(tax38, 1000)).toBe(150);
   });
 
   it('charges the percentage amount when landing on tax', () => {
@@ -299,7 +299,7 @@ describe('relic buyout', () => {
   const ownerLevel1 = () => {
     const s = structuredClone(started());
     s.properties = { 35: { ownerId: 'p1', level: 1 } };
-    s.players[0].gold = 600;
+    s.players[0].gold = 1500;
     return s;
   };
 
@@ -319,7 +319,7 @@ describe('relic buyout', () => {
     let s = rollFrom(ownerLevel1(), 30, 2, 3);
     s = reduce(s, 'p0', { type: 'BUY_RELIC' });
     expect(s.properties[35]).toEqual({ ownerId: 'p0', level: 1 });
-    expect(s.players[0].gold).toBe(600 - price);
+    expect(s.players[0].gold).toBe(1500 - price);
     expect(s.players[1].gold).toBe(STARTING_GOLD + price);
     expect(s.currentTurn).toBe(1);
   });

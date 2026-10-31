@@ -3,7 +3,7 @@ import { PIECE_CATALOG } from '../../three/models.js';
 import { Piece3D, PieceImage } from '../../three/Piece3D.jsx';
 import { Dice3D } from '../../three/Dice3D.jsx';
 
-const CATEGORIES = ['ALL', 'D&D Hero', 'Cờ Vua', 'Monopoly'];
+const CATEGORIES = ['ALL', 'Cờ Tỷ Phú', 'Cờ Vua', 'Cờ Cá Ngựa'];
 
 export default function TokenGallery({ isOpen, onClose }) {
   const [filter, setFilter] = useState('ALL');
@@ -47,10 +47,7 @@ export default function TokenGallery({ isOpen, onClose }) {
       >
         <header className="flex items-start justify-between gap-3 border-b border-amber-900/50 bg-stone-950 p-3 sm:p-4">
           <div>
-            <h2 className="font-display text-lg font-bold text-amber-400 sm:text-xl">🏛️ Bảo Tàng Quân Cờ 3D</h2>
-            <p className="text-[11px] text-stone-400">
-              {PIECE_CATALOG.length} mô hình dựng bằng Three.js · xoay 360° · xúc xắc D6/D20
-            </p>
+            <h2 className="font-display text-lg font-bold text-amber-400 sm:text-xl">🏛️ Tủ Quân Cờ 3D</h2>
           </div>
           <button
             type="button"
@@ -71,7 +68,6 @@ export default function TokenGallery({ isOpen, onClose }) {
               <span aria-hidden="true">{selected.icon}</span> {selected.name}
             </h3>
             <p className="text-xs font-semibold text-amber-400/90">{selected.category}</p>
-            <p className="mt-1 max-w-xs text-center text-xs text-stone-400">{selected.desc}</p>
 
             <div className="mt-4 w-full border-t border-stone-800 pt-3">
               <div className="mb-2 flex items-center justify-between">

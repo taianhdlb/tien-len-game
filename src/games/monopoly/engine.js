@@ -1,9 +1,9 @@
 import { BOARD_TILES, EVENTS, BLESSINGS, INSTANT_WIN_RELIC_IDS } from './data.js';
 
-export const STARTING_GOLD = 200;
-export const GO_SALARY = 120;
+export const STARTING_GOLD = 600;
+export const GO_SALARY = 300;
 export const JAIL_POSITION = 10;
-export const JAIL_BAIL = 30;
+export const JAIL_BAIL = 100;
 export const JAIL_DC = 12;
 export const MAX_JAIL_TURNS = 3;
 export const MAX_LEVEL = 3;
@@ -11,14 +11,14 @@ export const MAX_ROUNDS = 40;
 export const MAX_LOGS = 100;
 export const BOARD_SIZE = BOARD_TILES.length;
 
-export const TIER_NAMES = ['Đất Khảo Sát', 'Trại Tiền Đồn', 'Tháp Canh Đá', 'Đại Pháo Đài'];
+export const TIER_NAMES = ['Đất Nền', 'Nhà Cấp 4', 'Nhà Phố', 'Chung Cư'];
 
 export class GameError extends Error {}
 
 export const isActive = (p) => !p.bankrupt && !p.left;
 export const getRent = (tile, level = 0) => tile.rents?.[level] ?? 0;
 export const getUpgradeCost = (tile) => tile.upgradeCost ?? Math.round(tile.price * 0.5);
-// Chuộc lại Thánh Vật đã có chủ: trả 150% giá trị hiện tại cho chủ cũ để không khóa chết mục tiêu 3 Thánh Vật.
+// Chuộc lại Kỳ Quan đã có chủ: trả 150% giá trị hiện tại cho chủ cũ để mục tiêu 3 Kỳ Quan không bị khóa chết.
 export const RELIC_BUYOUT_RATE = 1.5;
 export const getRelicBuyout = (tile, level = 0) =>
   Math.round(((tile.price + getUpgradeCost(tile) * level) * RELIC_BUYOUT_RATE) / 5) * 5;
@@ -70,7 +70,7 @@ function bankrupt(s, idx) {
   for (const [tileId, prop] of Object.entries(s.properties)) {
     if (prop.ownerId === p.id) delete s.properties[tileId];
   }
-  log(s, `${p.name} đã phá sản! Mọi lãnh địa được trả về vương quốc.`, 'danger');
+  log(s, `${p.name} phá sản! Toàn bộ nhà đất được trả lại ngân hàng.`, 'danger');
 }
 
 // Takes `amount` from the player; if they cannot cover it they pay what they have and go bankrupt.
@@ -93,7 +93,7 @@ function sendToJail(s, idx) {
   p.inJail = true;
   p.jailTurns = 0;
   s.lastMove = { playerId: p.id, from, steps: 0, seq: (s.lastMove?.seq || 0) + 1, jump: true };
-  log(s, `${p.name} bị tống giam vào Ngục!`, 'danger');
+  log(s, `${p.name} bị áp giải vào phòng Tạm Giam!`, 'danger');
 }
 
 function checkWinner(s) {
@@ -104,7 +104,7 @@ function checkWinner(s) {
     s.winnerId = alive[0].id;
     s.winReason = 'LAST_STANDING';
     s.pending = null;
-    log(s, `${alive[0].name} là người trụ lại cuối cùng và giành chiến thắng!`, 'victory');
+    log(s, `${alive[0].name} là người chơi cuối cùng chưa phá sản nên thắng ván này!`, 'victory');
   } else if (alive.length === 0) {
     s.status = 'FINISHED';
     s.winnerId = null;
@@ -131,7 +131,7 @@ function finishByTimeLimit(s) {
   s.winReason = 'TIME';
   log(
     s,
-    `Hết ${MAX_ROUNDS} vòng chinh phạt! ${winner.name} thắng với ${countRelics(s, winner.id)} Thánh Vật và tổng tài sản ${getNetWorth(s, winner.id)}g.`,
+    `Hết ${MAX_ROUNDS} vòng! ${winner.name} lên ngôi tỷ phú với ${countRelics(s, winner.id)} Kỳ Quan và tổng tài sản ${getNetWorth(s, winner.id)}g.`,
     'victory'
   );
 }
@@ -142,7 +142,7 @@ function startTurn(s) {
   s.pending = null;
   if (!p.inJail) return;
   if (p.jailTurns >= MAX_JAIL_TURNS) {
-    log(s, `${p.name} mãn hạn tù sau ${MAX_JAIL_TURNS} lượt và nộp ${JAIL_BAIL}g tiền bảo lãnh.`);
+    log(s, `${p.name} mãn hạn tạm giam sau ${MAX_JAIL_TURNS} lượt, nộp ${JAIL_BAIL}g tiền bảo lãnh.`);
     p.inJail = false;
     p.jailTurns = 0;
     charge(s, idx, JAIL_BAIL);
@@ -194,7 +194,7 @@ function land(s, rng) {
       } else if (prop.level < MAX_LEVEL) {
         s.pending = { kind: 'UPGRADE', tileId: tile.id };
       } else {
-        log(s, `${p.name} thị sát Đại Pháo Đài ${tile.name} của mình.`);
+        log(s, `${p.name} về thăm khu ${TIER_NAMES[MAX_LEVEL]} ${tile.name} của mình.`);
         endTurn(s);
       }
       return;
@@ -229,7 +229,7 @@ function finishRelicWin(s, p) {
   s.winnerId = p.id;
   s.winReason = 'RELICS';
   s.pending = null;
-  log(s, `CHIẾN THẮNG TUYỆT ĐỐI! ${p.name} đã thu thập đủ 3 Thánh Vật!`, 'victory');
+  log(s, `THẮNG TUYỆT ĐỐI! ${p.name} đã sưu tập đủ 3 Kỳ Quan Việt Nam!`, 'victory');
 }
 
 function resolveD20(s, idx, pending, rng) {
@@ -243,10 +243,10 @@ function resolveD20(s, idx, pending, rng) {
     if (isSuccess(outcome)) {
       p.inJail = false;
       p.jailTurns = 0;
-      log(s, `${p.name} vượt ngục thành công (D20: ${roll} ≥ ${JAIL_DC})!`, 'success');
+      log(s, `${p.name} được tại ngoại (D20: ${roll} ≥ ${JAIL_DC})!`, 'success');
     } else {
       p.jailTurns = (p.jailTurns || 0) + 1;
-      log(s, `${p.name} vượt ngục thất bại (D20: ${roll} < ${JAIL_DC}).`, 'danger');
+      log(s, `${p.name} xin tại ngoại thất bại (D20: ${roll} < ${JAIL_DC}).`, 'danger');
     }
     return;
   }
@@ -257,9 +257,9 @@ function resolveD20(s, idx, pending, rng) {
     pending.d20 = { roll, outcome, dc: ev.dc, seq: s.d20Seq };
     if (isSuccess(outcome)) {
       p.gold += ev.passGold || 0;
-      log(s, `${p.name} kiểm định D20 thành công (${roll}): ${ev.passText}`, 'success');
+      log(s, `${p.name} thử vận (D20: ${roll}): ${ev.passText}`, 'success');
     } else {
-      log(s, `${p.name} kiểm định D20 thất bại (${roll}): ${ev.failText}`, 'danger');
+      log(s, `${p.name} thử vận xui (D20: ${roll}): ${ev.failText}`, 'danger');
       if (ev.failCost) charge(s, idx, ev.failCost);
       if (ev.failJail && !p.bankrupt) sendToJail(s, idx);
     }
@@ -271,20 +271,20 @@ function resolveD20(s, idx, pending, rng) {
   pending.d20 = { roll, outcome, dc: bl.dc, seq: s.d20Seq };
   if (isSuccess(outcome)) {
     p.gold += bl.passGold;
-    log(s, `${p.name} được Thần ${bl.god} ban phước (D20: ${roll}), nhận +${bl.passGold}g!`, 'success');
+    log(s, `${p.name} khấn ${bl.god} linh ứng (D20: ${roll}), nhận +${bl.passGold}g!`, 'success');
   } else if (bl.failCost > 0) {
-    log(s, `${p.name} làm phật lòng Thần ${bl.god} (D20: ${roll}), bị phạt ${bl.failCost}g.`, 'danger');
+    log(s, `${p.name} sắm lễ ${bl.god} nhưng sai lễ (D20: ${roll}), tốn ${bl.failCost}g.`, 'danger');
     charge(s, idx, bl.failCost);
   } else {
-    log(s, `${p.name} cầu nguyện Thần ${bl.god} nhưng không có phép màu (D20: ${roll}).`);
+    log(s, `${p.name} khấn ${bl.god} mà khí vận chưa tới (D20: ${roll}).`);
   }
 }
 
 function startGame(s, playerId, rng) {
-  if (s.status === 'PLAYING') fail('Trận đấu đang diễn ra.');
+  if (s.status === 'PLAYING') fail('Ván cờ đang diễn ra.');
   const connected = s.players.filter((p) => !p.left);
   if (connected[0]?.id !== playerId) fail('Chỉ chủ phòng mới có thể bắt đầu!');
-  if (connected.length < 2) fail('Cần ít nhất 2 chiến binh để bắt đầu.');
+  if (connected.length < 2) fail('Cần ít nhất 2 người chơi để bắt đầu.');
 
   s.players = connected.map((p) => ({
     ...p,
@@ -305,8 +305,8 @@ function startGame(s, playerId, rng) {
   s.lastMove = null;
   s.winnerId = null;
   s.winReason = null;
-  log(s, `Cuộc chinh phạt bắt đầu! Mỗi chiến binh nhận ${STARTING_GOLD}g lộ phí.`, 'gold');
-  log(s, `Giới hạn ${MAX_ROUNDS} vòng: hết hạn, người nhiều Thánh Vật rồi đến tổng tài sản cao nhất sẽ thắng.`, 'muted');
+  log(s, `Ván cờ bắt đầu! Mỗi người chơi được phát ${STARTING_GOLD}g vốn làm ăn.`, 'gold');
+  log(s, `Giới hạn ${MAX_ROUNDS} vòng: hết vòng, người sưu được nhiều Kỳ Quan rồi đến tổng tài sản cao nhất sẽ thắng.`, 'muted');
 }
 
 // Pure reducer: returns the next room state or throws GameError. `rng` is injectable for deterministic tests.
@@ -319,7 +319,7 @@ export function reduce(state, playerId, action, rng = Math.random) {
     return s;
   }
 
-  if (s.status !== 'PLAYING') fail('Trận đấu chưa bắt đầu.');
+  if (s.status !== 'PLAYING') fail('Ván cờ chưa bắt đầu.');
   const idx = s.currentTurn;
   const p = s.players[idx];
 
@@ -336,7 +336,7 @@ export function reduce(state, playerId, action, rng = Math.random) {
 
   switch (action.type) {
     case 'ROLL': {
-      if (s.pending) fail('Hãy hoàn tất sự kiện hiện tại trước.');
+      if (s.pending) fail('Hãy hoàn tất quyết định hiện tại trước.');
       const dice = [rollDie(rng, 6), rollDie(rng, 6)];
       const steps = dice[0] + dice[1];
       const from = p.position;
@@ -345,10 +345,10 @@ export function reduce(state, playerId, action, rng = Math.random) {
       s.rollSeq = (s.rollSeq || 0) + 1;
       s.lastMove = { playerId: p.id, from, steps, seq: (s.lastMove?.seq || 0) + 1 };
       p.position = to;
-      log(s, `${p.name} gieo [${dice[0]} + ${dice[1]} = ${steps}], tiến vào ${BOARD_TILES[to].name}.`);
+      log(s, `${p.name} gieo [${dice[0]} + ${dice[1]} = ${steps}], đáp xuống ${BOARD_TILES[to].name}.`);
       if (from + steps >= BOARD_SIZE) {
         p.gold += GO_SALARY;
-        log(s, `${p.name} đi qua Cổng Khởi Hành, nhận +${GO_SALARY}g.`, 'gold');
+        log(s, `${p.name} đi qua Ô Xuất Phát, nhận lương ${GO_SALARY}g.`, 'gold');
       }
       land(s, rng);
       break;
@@ -357,7 +357,7 @@ export function reduce(state, playerId, action, rng = Math.random) {
     case 'BUY': {
       const { tileId } = requirePending(s, 'BUY');
       const tile = BOARD_TILES[tileId];
-      if (p.gold < tile.price) fail('Không đủ vàng để mua lãnh địa này.');
+      if (p.gold < tile.price) fail('Không đủ vàng để mua mảnh đất này.');
       p.gold -= tile.price;
       s.properties[tileId] = { ownerId: p.id, level: 0 };
       log(s, `${p.name} mua ${tile.name} với giá ${tile.price}g.`, 'gold');
@@ -372,8 +372,8 @@ export function reduce(state, playerId, action, rng = Math.random) {
     case 'BUY_RELIC': {
       const pending = requirePending(s, 'RENT');
       const tile = BOARD_TILES[pending.tileId];
-      if (tile.type !== 'RELIC' || !pending.buyoutPrice) fail('Ô này không thể chuộc Thánh Vật.');
-      if (p.gold < pending.buyoutPrice) fail('Không đủ vàng để chuộc Thánh Vật.');
+      if (tile.type !== 'RELIC' || !pending.buyoutPrice) fail('Ô này không phải Kỳ Quan để chuộc.');
+      if (p.gold < pending.buyoutPrice) fail('Không đủ vàng để chuộc Kỳ Quan.');
       const owner = s.players.find((x) => x.id === pending.ownerId);
       p.gold -= pending.buyoutPrice;
       if (owner) owner.gold += pending.buyoutPrice;
@@ -396,7 +396,7 @@ export function reduce(state, playerId, action, rng = Math.random) {
       const tile = BOARD_TILES[tileId];
       const prop = s.properties[tileId];
       const cost = getUpgradeCost(tile);
-      if (prop.level >= MAX_LEVEL) fail('Lãnh địa đã đạt cấp tối đa.');
+      if (prop.level >= MAX_LEVEL) fail('Đất đã xây tới mức tối đa.');
       if (p.gold < cost) fail('Không đủ vàng để nâng cấp.');
       p.gold -= cost;
       prop.level += 1;
@@ -457,7 +457,7 @@ export function reduce(state, playerId, action, rng = Math.random) {
       p.inJail = false;
       p.jailTurns = 0;
       s.pending = null;
-      log(s, `${p.name} nộp ${JAIL_BAIL}g bảo lãnh và rời Ngục Giam.`);
+      log(s, `${p.name} nộp ${JAIL_BAIL}g bảo lãnh và được tại ngoại.`);
       break;
     }
 
@@ -466,7 +466,7 @@ export function reduce(state, playerId, action, rng = Math.random) {
       if (pending.kind === 'TELEPORT') {
         p.position = pending.target;
         s.lastMove = { playerId: p.id, from: BOARD_TILES[pending.tileId].id, steps: 0, seq: (s.lastMove?.seq || 0) + 1, jump: true };
-        log(s, `${p.name} bước qua cổng không gian đến ${BOARD_TILES[pending.target].name}!`);
+        log(s, `${p.name} lên máy bay, đổi chặng sang ${BOARD_TILES[pending.target].name}!`);
         endTurn(s);
       } else if (pending.kind === 'GO_TO_JAIL') {
         sendToJail(s, idx);

@@ -4,16 +4,16 @@ import { TIER_NAMES, GO_SALARY, JAIL_BAIL, JAIL_DC, getUpgradeCost } from './eng
 import { FantasyIcon } from '../../components/Monopoly/FantasyIcons.jsx';
 
 const TYPE_LABEL = {
-  GO: 'Cổng khởi hành',
-  PROPERTY: 'Lãnh địa',
-  RELIC: 'Thánh vật',
-  EVENT: 'Sự kiện D20',
-  BLESSING: 'Điện thờ',
-  TAX: 'Thuế hoàng gia',
-  TELEPORT: 'Cổng dịch chuyển',
-  JAIL: 'Ngục giam',
-  PARKING: 'Nghỉ chân',
-  GO_TO_JAIL: 'Lệnh bắt giữ'
+  GO: 'Ô Xuất Phát',
+  PROPERTY: 'Nhà Đất',
+  RELIC: 'Kỳ Quan',
+  EVENT: 'Cơ Hội',
+  BLESSING: 'Khí Vận',
+  TAX: 'Thuế',
+  TELEPORT: 'Chuyến Bay',
+  JAIL: 'Tạm Giam',
+  PARKING: 'Bãi Đỗ Xe',
+  GO_TO_JAIL: 'Lệnh Bắt Giữ'
 };
 
 export default function TileInspector({ tile, room, onClose }) {
@@ -57,7 +57,7 @@ export default function TileInspector({ tile, room, onClose }) {
           </div>
           {relic && (
             <span className="shrink-0 rounded-full border border-amber-500/60 bg-amber-950/60 px-2 py-0.5 text-[9px] font-black text-amber-300 uppercase">
-              Thánh vật
+              Kỳ quan
             </span>
           )}
           <button
@@ -79,7 +79,7 @@ export default function TileInspector({ tile, room, onClose }) {
             )}
             {tile.upgradeCost && (
               <span className="rounded-full border border-stone-700 bg-stone-950 px-2 py-0.5 text-stone-300">
-                Nâng cấp: {getUpgradeCost(tile)}g
+                Xây dựng: {getUpgradeCost(tile)}g
               </span>
             )}
             <span
@@ -90,7 +90,7 @@ export default function TileInspector({ tile, room, onClose }) {
                 background: ownerColor ? `${ownerColor}1a` : '#0c0a09'
               }}
             >
-              {owner ? `Chủ sở hữu: ${owner.name}` : 'Chưa có chủ'}
+              {owner ? `Chủ đất: ${owner.name}` : 'Chưa có chủ'}
             </span>
             {prop && (
               <span className="rounded-full border border-stone-700 bg-stone-950 px-2 py-0.5 text-stone-300">
@@ -109,7 +109,7 @@ export default function TileInspector({ tile, room, onClose }) {
             )}
             {tile.type === 'GO' && (
               <span className="rounded-full border border-emerald-800 bg-stone-950 px-2 py-0.5 text-emerald-300">
-                Trợ cấp: {GO_SALARY}g mỗi vòng
+                Lương: {GO_SALARY}g mỗi vòng
               </span>
             )}
             {tile.type === 'JAIL' && (
@@ -118,8 +118,6 @@ export default function TileInspector({ tile, room, onClose }) {
               </span>
             )}
           </div>
-
-          {tile.desc && <p className="text-xs leading-relaxed text-stone-400">{tile.desc}</p>}
 
           {tile.rents && (
             <div>

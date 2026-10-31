@@ -8,7 +8,7 @@ import { FantasyIcon } from '../../components/Monopoly/FantasyIcons.jsx';
 
 export default function Lobby({ connected, onJoin, onOpenGallery }) {
   const [name, setName] = useState(getSavedName);
-  const [roomId, setRoomId] = useState('DND_1');
+  const [roomId, setRoomId] = useState('VN_1');
   const [classId, setClassId] = useState('fighter');
   const [busy, setBusy] = useState(false);
   const { notify } = useToast();
@@ -40,10 +40,10 @@ export default function Lobby({ connected, onJoin, onOpenGallery }) {
         <div className="mb-4 flex items-start justify-between gap-3 border-b border-amber-900/50 pb-3">
           <div>
             <h1 className="font-display text-xl font-bold text-amber-400 text-shadow-gold sm:text-2xl">
-              Vương Quốc Baldur&apos;s Gate
+              Cờ Tỷ Phú Việt Nam
             </h1>
             <p className="mt-0.5 text-[11px] text-stone-400 sm:text-xs">
-              Cờ Tỷ Phú nhập vai D&amp;D · 2–4 chiến binh · Realtime
+              Nhà đất toàn quốc · 2–4 người chơi · Realtime
             </p>
           </div>
           <button
@@ -51,7 +51,7 @@ export default function Lobby({ connected, onJoin, onOpenGallery }) {
             onClick={onOpenGallery}
             className="flex shrink-0 items-center gap-1 rounded-lg border border-amber-700/50 bg-stone-800 px-2.5 py-1.5 text-[11px] font-bold text-amber-300 transition hover:bg-stone-700"
           >
-            <span aria-hidden="true">🏛️</span> Model 3D
+            <span aria-hidden="true">🏛️</span> Quân Cờ
           </button>
         </div>
 
@@ -72,7 +72,7 @@ export default function Lobby({ connected, onJoin, onOpenGallery }) {
               value={roomId}
               onChange={(e) => setRoomId(e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, ''))}
               maxLength={20}
-              placeholder="DND_1"
+              placeholder="VN_1"
               className="mt-1 w-full rounded-lg border border-stone-700 bg-stone-950 px-3 py-2 font-mono text-sm font-bold text-amber-300 outline-none transition focus:border-amber-500"
             />
           </label>
@@ -89,15 +89,14 @@ export default function Lobby({ connected, onJoin, onOpenGallery }) {
             <p className="flex items-center gap-1.5 text-sm font-bold text-amber-300">
               <span aria-hidden="true">{selected.icon}</span> {selected.name}
             </p>
-            <p className="mt-0.5 text-xs leading-snug text-stone-400">{selected.desc}</p>
             <p className="mt-1 text-[10px] font-semibold tracking-wide text-emerald-400/90 uppercase">
-              {STARTING_GOLD} vàng khởi đầu · 3 Thánh Vật · tối đa {MAX_ROUNDS} vòng
+              {STARTING_GOLD}g vốn · 3 Kỳ Quan · tối đa {MAX_ROUNDS} vòng
             </p>
           </div>
         </div>
 
         <fieldset className="mb-4">
-          <legend className="mb-2 text-xs font-semibold text-stone-300">Chọn Class nhân vật</legend>
+          <legend className="mb-2 text-xs font-semibold text-stone-300">Chọn quân cờ của bạn</legend>
           <div className="grid grid-cols-5 gap-1.5">
             {CLASSES.map((c) => {
               const active = c.id === classId;
@@ -126,12 +125,12 @@ export default function Lobby({ connected, onJoin, onOpenGallery }) {
           disabled={busy || !connected}
           className="w-full rounded-xl bg-amber-700 py-3 text-sm font-black text-white shadow-[0_0_22px_rgba(217,119,6,0.45)] transition hover:scale-[1.01] hover:bg-amber-600 disabled:cursor-not-allowed disabled:opacity-50 sm:text-base"
         >
-          {!connected ? 'Đang kết nối máy chủ…' : busy ? 'Đang vào phòng…' : '⚔️ Vào Bàn Chơi'}
+          {!connected ? 'Đang kết nối máy chủ…' : busy ? 'Đang vào phòng…' : '🎲 Ngồi Vào Bàn Cờ'}
         </button>
 
         <p className="mt-3 flex items-center justify-center gap-2 text-center text-[10px] text-stone-500">
           <FantasyIcon name="relic" className="h-4 w-4" />
-          Chia sẻ cùng mã phòng để bạn bè tham gia · Hỗ trợ tối đa 4 người
+          Cùng nhập một mã phòng để chơi chung · Tối đa 4 người
         </p>
       </form>
     </div>

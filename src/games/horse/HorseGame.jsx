@@ -1,25 +1,33 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSocketRoom } from '../../lib/useSocketRoom.js';
+import { useOptimisticDispatch } from '../../lib/useOptimisticDispatch.js';
 import { useToast } from '../../components/toast-context.js';
 import { saveName } from '../../lib/player.js';
-import { COLORS } from './board.js';
-import { GameError, reduce } from './engine.js';
+import { COLORS, trackIndex } from './board.js';
+import { GameError, homeFaceFor, reduce } from './engine.js';
 import HorseLobby from './HorseLobby.jsx';
 import HorseWaitingRoom from './HorseWaitingRoom.jsx';
 import HorseBoard from './HorseBoard.jsx';
 import { HorsePlayers, TurnPanel } from './HorsePanel.jsx';
 import HorseRules from './HorseRules.jsx';
 import LogPanel from '../../components/LogPanel.jsx';
+import { Dice3D } from '../../three/Dice3D.jsx';
 import { PieceImage } from '../../three/Piece3D.jsx';
 
 const MOBILE_TABS = [
   { id: 'BOARD', label: 'Bàn cờ', icon: '🏇' },
-  { id: 'TURN', label: 'Lượt chơi', icon: '🎲' },
+  { id: 'PLAYERS', label: 'Kỵ sĩ', icon: '👥' },
   { id: 'LOGS', label: 'Nhật ký', icon: '📜' }
 ];
 
+const moveLabel = (move, colorId) => {
+  if (move.kind === 'DEPLOY') return 'Xuất chuồng';
+  if (move.kind === 'HOME') return `Vào chuồng bậc ${move.target.pos}`;
+  return `Tới ô ${trackIndex(colorId, move.target.pos) + 1}`;
+};
+
 export default function HorseGame() {
-  const { myId, room, setRoom, joined, connected, join, leave, emit } = useSocketRoom('horse', 'horse:state');
+  const { myId, room, setRoom, joined, connected, join, leave, emit, getServerRoom } = useSocketRoom('horse', 'horse:state');
   const { notify } = useToast();
   const [mobileTab, setMobileTab] = useState('BOARD');
   const [selection, setSelection] = useState({ signature: null, horseId: null });
@@ -33,26 +41,21 @@ export default function HorseGame() {
   const isMyTurn = current?.id === myId;
   const hostId = room?.players.find((player) => !player.left)?.id;
 
-  const dispatch = useCallback(
-    (action) => {
-      if (!room) return false;
-      let next;
-      try {
-        next = reduce(room, myId, action);
-      } catch (err) {
-        if (err instanceof GameError) notify(err.message, 'error');
-        else console.error(err);
-        return false;
-      }
-      setRoom(next);
-      emit('horse:submit', { state: next });
-      return true;
-    },
-    [room, myId, notify, emit, setRoom]
-  );
+  // Giống Cờ Tỷ Phú: submit bị chê là "trạng thái đã cũ" thì chơi lại trên snapshot mới của server.
+  const dispatch = useOptimisticDispatch({
+    room,
+    myId,
+    event: 'horse:submit',
+    reduce,
+    GameError,
+    setRoom,
+    emit,
+    getServerRoom
+  });
 
+  const pendingMoves = room?.pending?.moves ?? [];
   const pendingSignature = room?.pending
-    ? `${room.rollSeq}:${room.pending.moves.map((move) => `${move.horseId}:${move.die}:${move.target.status}:${move.target.pos}`).join('|')}`
+    ? `${room.rollSeq}:${pendingMoves.map((move) => `${move.horseId}:${move.target.status}:${move.target.pos}`).join('|')}`
     : null;
   const selectedHorse = selection.signature === pendingSignature ? selection.horseId : null;
   const setSelectedHorse = useCallback(
@@ -112,8 +115,8 @@ export default function HorseGame() {
     [dispatch]
   );
   const handleSkip = useCallback(() => dispatch({ type: 'SKIP_TURN' }), [dispatch]);
-  const handleStart = useCallback(() => {
-    if (dispatch({ type: 'START' })) setMobileTab('BOARD');
+  const handleStart = useCallback(async () => {
+    if (await dispatch({ type: 'START' })) setMobileTab('BOARD');
   }, [dispatch]);
 
   if (!joined || !room) {
@@ -134,7 +137,24 @@ export default function HorseGame() {
 
   const winner = room.players.find((player) => player.id === room.winnerId);
   const winnerColor = winner?.color ? COLORS[winner.color] : null;
-  const diceValue = Array.isArray(room.dice) ? room.dice : null;
+  const die = room.die ?? null;
+  const faceNeeded = current ? homeFaceFor(current) : null;
+  const choosing = isMyTurn && pendingMoves.length > 0;
+  const finished = room.status === 'FINISHED';
+  const turnText = finished
+    ? winner
+      ? `${winner.name} chiến thắng!`
+      : 'Ván đấu kết thúc'
+    : isMyTurn
+      ? 'Lượt của bạn'
+      : `Lượt của ${current?.name ?? '—'}`;
+  const hintText = finished
+    ? 'Đủ 4 ngựa vào chuồng đúng thứ tự 6 – 5 – 4 – 3.'
+    : choosing
+      ? 'Chọn một quân đang nhấp nháy'
+      : die
+        ? `Vừa tung ${die}${die === 6 ? ' · được tung tiếp' : ''}`
+        : `1 viên D6 · ra 1 hoặc 6 mới xuất chuồng${faceNeeded ? ` · vào chuồng cần ${faceNeeded}` : ''}`;
 
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-emerald-950/30 via-stone-950 to-black">
@@ -198,16 +218,13 @@ export default function HorseGame() {
             }`}
           >
             <span aria-hidden="true">{tab.icon}</span> {tab.label}
-            {tab.id === 'TURN' && room.pending && isMyTurn && (
-              <span className="ml-1 inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400 align-middle" />
-            )}
           </button>
         ))}
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <section
-          className={`flex min-h-0 min-w-0 flex-1 flex-col items-center justify-center gap-1 p-1 sm:p-2 ${
+          className={`min-h-0 min-w-0 flex-1 flex-col gap-1 p-1 sm:p-2 ${
             mobileTab === 'BOARD' ? 'flex' : 'hidden'
           } lg:flex`}
         >
@@ -222,56 +239,81 @@ export default function HorseGame() {
             />
           </div>
 
-          <div className="flex w-full shrink-0 items-center justify-between gap-2 rounded-xl border border-stone-800 bg-stone-950/90 px-2.5 py-1.5 lg:hidden">
-            <div className="flex min-w-0 items-center gap-1.5">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: currentColor?.css ?? '#a8a29e' }} />
-              <span className="truncate text-[11px] font-bold text-stone-200">
-                {isMyTurn ? 'Lượt của bạn' : `Lượt của ${current?.name ?? '—'}`}
-              </span>
-              {diceValue && (
-                <span className="shrink-0 font-mono text-[10px] text-amber-300">
-                  🎲 {diceValue[0]}+{diceValue[1]}
+          {/* Bảng điều khiển lượt nằm ngay dưới bàn cờ: không phải chuyển tab trên điện thoại. */}
+          <div className="w-full shrink-0 rounded-xl border border-stone-800 bg-stone-950/90 px-2.5 py-2 lg:hidden">
+            <div className="flex items-center gap-2.5">
+              <div className={`shrink-0 transition ${die ? '' : 'opacity-30 grayscale'}`}>
+                <Dice3D type="D6" value={die ?? 1} rollKey={room.rollSeq} size={54} theme="ivory" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="flex items-center gap-1.5 truncate text-[11px] font-black text-stone-200">
+                  <span
+                    className="h-2.5 w-2.5 shrink-0 rounded-full"
+                    style={{ background: (finished ? winnerColor?.css : currentColor?.css) ?? '#a8a29e' }}
+                  />
+                  {turnText}
+                  {room.bonusRolls > 0 && !finished && (
+                    <span className="rounded-full bg-amber-950/80 px-1.5 text-[9px] font-black text-amber-300">
+                      tung tiếp ×{room.bonusRolls}
+                    </span>
+                  )}
+                </p>
+                <p className="truncate text-[10px] text-stone-500">{hintText}</p>
+              </div>
+              {finished ? (
+                <span className="shrink-0 rounded-lg bg-amber-950/70 px-2.5 py-2 text-[10px] font-black text-amber-300">
+                  🏁 Kết thúc
                 </span>
-              )}
-            </div>
-            {isMyTurn ? (
-              room.pending ? (
-                <button
-                  type="button"
-                  onClick={() => setMobileTab('TURN')}
-                  className="shrink-0 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-black text-white"
-                >
-                  Chọn nước đi ›
-                </button>
-              ) : (
+              ) : isMyTurn ? (
                 <button
                   type="button"
                   onClick={handleRoll}
-                  className="shrink-0 rounded-lg bg-amber-500 px-2.5 py-1 text-[11px] font-black text-stone-950"
+                  disabled={choosing}
+                  className={`shrink-0 rounded-xl px-4 py-2.5 text-xs font-black transition ${
+                    choosing
+                      ? 'cursor-not-allowed bg-stone-800 text-stone-500'
+                      : 'bg-gradient-to-r from-amber-500 to-amber-400 text-stone-950 shadow-[0_0_18px_rgba(245,158,11,0.35)] active:scale-95'
+                  }`}
                 >
-                  🎲 Tung
+                  🎲 TUNG
                 </button>
-              )
-            ) : (
-              <span className="shrink-0 text-[10px] text-stone-500">Đang chờ…</span>
+              ) : (
+                <span className="shrink-0 text-[10px] text-stone-500">Đang chờ…</span>
+              )}
+            </div>
+
+            {choosing && (
+              <div className="mt-2 flex gap-1.5 overflow-x-auto pb-0.5">
+                {pendingMoves.map((move, index) => (
+                  <button
+                    key={`${move.horseId}-${move.target.status}-${move.target.pos}`}
+                    type="button"
+                    onClick={() => handleMove(index)}
+                    className="shrink-0 rounded-lg border border-emerald-700/60 bg-emerald-950/50 px-2.5 py-1.5 text-[11px] font-bold text-emerald-100 transition active:scale-95"
+                  >
+                    Ngựa {current.horses.findIndex((horse) => horse.id === move.horseId) + 1} · {moveLabel(move, current.color)}
+                    {move.captures.length > 0 && <span className="ml-1 text-rose-300">⚔{move.captures.length}</span>}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         </section>
 
-        <aside className="flex min-h-0 w-full flex-col gap-2 border-stone-800 bg-stone-950/60 p-2 sm:p-3 lg:w-[23rem] lg:border-l xl:w-[25rem]">
-          <div
-            className={`${mobileTab === 'TURN' ? 'flex' : 'hidden'} min-h-0 flex-1 flex-col gap-2 overflow-y-auto lg:flex lg:max-h-[64%]`}
-          >
+        <aside className="min-h-0 w-full flex-col gap-2 border-stone-800 bg-stone-950/60 p-2 sm:p-3 lg:flex lg:w-[23rem] lg:border-l xl:w-[25rem]">
+          <div className="hidden min-h-0 shrink-0 lg:block lg:max-h-[52%] lg:overflow-y-auto">
             <TurnPanel
               room={room}
               myId={myId}
               isMyTurn={isMyTurn}
-              selectedHorse={selectedHorse}
-              onSelectHorse={setSelectedHorse}
               onRoll={handleRoll}
               onMove={handleMove}
               onSkip={handleSkip}
             />
+          </div>
+          <div
+            className={`${mobileTab === 'PLAYERS' ? 'flex' : 'hidden'} min-h-0 flex-1 flex-col gap-2 overflow-y-auto lg:flex`}
+          >
             <HorsePlayers room={room} myId={myId} />
           </div>
           <div className={`${mobileTab === 'LOGS' ? 'flex' : 'hidden'} min-h-0 flex-1 flex-col lg:flex`}>
@@ -285,7 +327,7 @@ export default function HorseGame() {
           <div className="anim-pop w-full max-w-md overflow-hidden rounded-2xl border-2 border-amber-600/60 bg-stone-950 shadow-[0_0_80px_rgba(245,158,11,0.2)]">
             <div className="bg-gradient-to-b from-amber-950/50 to-transparent px-5 pt-5 text-center">
               <p className="text-[10px] font-black tracking-[0.25em] text-amber-400/80 uppercase">
-                {room.winReason === 'LAST_STANDING' ? 'Trụ lại cuối cùng' : 'Về đích'}
+                {room.winReason === 'LAST_STANDING' ? 'Trụ lại cuối cùng' : 'Về chuồng'}
               </p>
               <div className="mt-1 flex justify-center">
                 <PieceImage classId="horse" hexColor={winnerColor?.hex ?? 0xd4a843} size={120} className="drop-shadow-[0_10px_18px_rgba(0,0,0,0.8)]" />
@@ -296,7 +338,7 @@ export default function HorseGame() {
               {winnerColor && (
                 <p className="mt-1 flex items-center justify-center gap-1.5 text-xs text-stone-300">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ background: winnerColor.css }} />
-                  {winnerColor.label} · {room.winReason === 'LAST_STANDING' ? 'trụ lại cuối cùng' : '4 ngựa đã yên vị'}
+                  {winnerColor.label} · {room.winReason === 'LAST_STANDING' ? 'trụ lại cuối cùng' : 'đủ 4 ngựa vào chuồng'}
                 </p>
               )}
             </div>
@@ -304,7 +346,7 @@ export default function HorseGame() {
               <p className="text-center text-[11px] leading-relaxed text-stone-400">
                 {room.winReason === 'LAST_STANDING'
                   ? 'Tất cả đối thủ đã rời đường đua.'
-                  : 'Chúc mừng! Bốn ngựa đã chiếm trọn các bậc 3 – 4 – 5 – 6.'}
+                  : 'Bốn ngựa vào chuồng đúng thứ tự 6 – 5 – 4 – 3.'}
               </p>
               <div className="mt-4 flex gap-2">
                 <button

@@ -131,7 +131,7 @@ export default function HorseWaitingRoom({ room, myId, onStart, onLeave, onShare
         </div>
 
         <p className="mt-3 text-center text-[10px] text-stone-600">
-          Mẹo: tối đa 4 người · mỗi người 4 ngựa · tung đôi hoặc 1–6 để xuất quân
+          Mẹo: tối đa 4 người · mỗi người 4 ngựa · tung ra 1 hoặc 6 để xuất chuồng · chủ phòng tung trước
         </p>
       </div>
 

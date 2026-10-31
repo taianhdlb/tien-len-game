@@ -1,48 +1,96 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { BOARD_SIZE } from './engine.js';
 
-const STEP_MS = 140;
+const STEP_MS = 130;
+// 2×D6 tối đa 12 ô: khoảng cách dài hơn nghĩa là nhảy tức thì (chặng bay, tạm giam).
+const MAX_WALK = 12;
+
+const walkingGap = (from, to) => (to - from + BOARD_SIZE) % BOARD_SIZE;
+const positionsOf = (room) =>
+  Object.fromEntries((room?.players || []).filter((p) => !p.left).map((p) => [p.id, p.position || 0]));
 
 /**
- * Walks pawns tile-by-tile from `lastMove` so every client sees the same path.
- * Jumps (teleport / jail) and non-move updates snap straight to the authoritative position.
+ * Quân cờ bước từng ô tới vị trí chuẩn của phòng. Trạng thái di chuyển sống ngoài React
+ * (một interval tự dừng khi tới nơi), nên broadcast của người khác chỉ đổi đích đến
+ * chứ không cắt ngang bước đi — hết lỗi icon đứng yên ở ô cũ khi chơi 4 người.
  */
+export function createPawnWalker() {
+  let targets = {};
+  let positions = {};
+  let snapshot = {};
+  let timer = 0;
+  const listeners = new Set();
+
+  const stopRun = () => {
+    if (timer) {
+      clearInterval(timer);
+      timer = 0;
+    }
+  };
+
+  const publish = () => {
+    snapshot = { ...positions };
+    listeners.forEach((notify) => notify());
+  };
+
+  const step = () => {
+    let moved = false;
+    let stillBehind = false;
+    Object.keys(targets).forEach((id) => {
+      if (positions[id] === targets[id]) return;
+      positions[id] = (positions[id] + 1) % BOARD_SIZE;
+      moved = true;
+      if (positions[id] !== targets[id]) stillBehind = true;
+    });
+    if (moved) publish();
+    // Dừng ngay ở bước cuối để không để lại interval chạy chờ.
+    if (!stillBehind) stopRun();
+  };
+
+  return {
+    sync(room) {
+      if (room?.status !== 'PLAYING') {
+        stopRun();
+        targets = {};
+        positions = positionsOf(room);
+        publish();
+        return;
+      }
+
+      targets = positionsOf(room);
+      Object.keys(positions).forEach((id) => {
+        if (!(id in targets)) delete positions[id];
+      });
+      Object.entries(targets).forEach(([id, to]) => {
+        const from = positions[id];
+        if (from === undefined || walkingGap(from, to) > MAX_WALK) positions[id] = to;
+      });
+      publish();
+
+      const walking = Object.keys(targets).some((id) => positions[id] !== targets[id]);
+      if (walking && !timer) timer = setInterval(step, STEP_MS);
+      if (!walking) stopRun();
+    },
+    subscribe(notify) {
+      listeners.add(notify);
+      return () => listeners.delete(notify);
+    },
+    getSnapshot: () => snapshot,
+    stop() {
+      stopRun();
+      listeners.clear();
+    }
+  };
+}
+
 export function usePawnPositions(room) {
-  const [display, setDisplay] = useState({});
-  const seenSeq = useRef(null);
+  const [walker] = useState(createPawnWalker);
 
   useEffect(() => {
-    if (!room) return;
-    const move = room.lastMove;
-    const timers = [];
+    walker.sync(room);
+  }, [walker, room]);
 
-    const sync = () =>
-      setDisplay(Object.fromEntries(room.players.map((p) => [p.id, p.position || 0])));
+  useEffect(() => () => walker.stop(), [walker]);
 
-    if (!move) {
-      seenSeq.current = null;
-      timers.push(setTimeout(sync, 0));
-    } else if (move.seq !== seenSeq.current) {
-      seenSeq.current = move.seq;
-      if (!move.jump && move.steps > 0) {
-        for (let step = 1; step <= move.steps; step += 1) {
-          timers.push(
-            setTimeout(
-              () => setDisplay((prev) => ({ ...prev, [move.playerId]: (move.from + step) % BOARD_SIZE })),
-              step * STEP_MS
-            )
-          );
-        }
-        timers.push(setTimeout(sync, move.steps * STEP_MS + 80));
-      } else {
-        timers.push(setTimeout(sync, 0));
-      }
-    } else {
-      timers.push(setTimeout(sync, 0));
-    }
-
-    return () => timers.forEach(clearTimeout);
-  }, [room, room?.lastMove?.seq, room?.players?.length, room?.status]);
-
-  return display;
+  return useSyncExternalStore(walker.subscribe, walker.getSnapshot, walker.getSnapshot);
 }

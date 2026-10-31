@@ -1,19 +1,24 @@
 import { describe, expect, it } from 'vitest';
-import { COLORS } from './board.js';
+import { COLORS, TRACK_LENGTH } from './board.js';
 import {
+  DEPLOY_FACES,
   GameError,
-  MAX_BONUS_ROLLS,
+  HOME_FACES,
+  ROLL_AGAIN_FACE,
   createInitialState,
-  isDeployRoll,
+  homeFaceFor,
+  isSatNut,
+  listMoves,
   reduce
 } from './engine.js';
 
-const die = (value) => (value - 1) / 6 + 0.001;
+const GATE = TRACK_LENGTH - 1;
 
-function rng(values) {
+const die = (value) => (value - 1) / 6 + 0.001;
+const rng = (values) => {
   let index = 0;
   return () => values[index++] ?? 0;
-}
+};
 
 function roomWith(count) {
   const state = createInitialState('TEST');
@@ -27,9 +32,8 @@ function roomWith(count) {
   return state;
 }
 
-function started(count = 2, first = 0) {
-  const state = roomWith(count);
-  return reduce(state, 'p1', { type: 'START' }, rng([(first + 0.001) / count]));
+function started(count = 2) {
+  return reduce(roomWith(count), 'p1', { type: 'START' });
 }
 
 function setHorses(state, playerIndex, specs) {
@@ -42,18 +46,19 @@ function setHorses(state, playerIndex, specs) {
   return state;
 }
 
-function roll(state, d1, d2, playerId) {
+function turn(state, playerIndex) {
+  state.currentTurn = playerIndex;
+  return state;
+}
+
+function roll(state, value, playerId) {
   const actor = playerId ?? state.players[state.currentTurn].id;
-  return reduce(state, actor, { type: 'ROLL' }, rng([die(d1), die(d2)]));
+  return reduce(state, actor, { type: 'ROLL' }, rng([die(value)]));
 }
 
 function move(state, index, playerId) {
   const actor = playerId ?? state.players[state.currentTurn].id;
   return reduce(state, actor, { type: 'MOVE', index });
-}
-
-function findMove(state, horseId, dieKey) {
-  return state.pending.moves.findIndex((entry) => entry.horseId === horseId && entry.die === dieKey);
 }
 
 describe('Cờ Cá Ngựa · khởi tạo', () => {
@@ -67,244 +72,248 @@ describe('Cờ Cá Ngựa · khởi tạo', () => {
     expect(started(4).players.map((player) => player.color)).toEqual(['RED', 'BLUE', 'GREEN', 'YELLOW']);
   });
 
-  it('chọn người đi trước ngẫu nhiên', () => {
-    expect(started(4, 2).currentTurn).toBe(2);
-    expect(started(4, 3).currentTurn).toBe(3);
+  it('chủ phòng là người tung xúc xắc trước', () => {
+    expect(started(4).currentTurn).toBe(0);
+    expect(started(4).die).toBeNull();
+    expect(started(2).logs.at(-1).text).toMatch(/chủ phòng/);
   });
 
   it('chỉ chủ phòng được bắt đầu và cần ít nhất 2 người', () => {
-    expect(() => reduce(roomWith(2), 'p2', { type: 'START' }, rng([0]))).toThrow(GameError);
-    expect(() => reduce(roomWith(1), 'p1', { type: 'START' }, rng([0]))).toThrow('ít nhất 2');
+    expect(() => reduce(roomWith(2), 'p2', { type: 'START' })).toThrow(GameError);
+    expect(() => reduce(roomWith(1), 'p1', { type: 'START' })).toThrow('ít nhất 2');
   });
 
   it('giới hạn tối đa 4 người chơi', () => {
-    expect(() => reduce(roomWith(5), 'p1', { type: 'START' }, rng([0]))).toThrow('tối đa 4');
+    expect(() => reduce(roomWith(5), 'p1', { type: 'START' })).toThrow('tối đa 4');
   });
 
-  it('không cho vào ván đã kết thúc', () => {
+  it('không cho tung ở ván đã kết thúc', () => {
     const state = started(2);
     state.status = 'FINISHED';
-    expect(() => roll(state, 1, 2)).toThrow(GameError);
+    expect(() => roll(state, 3)).toThrow(GameError);
   });
 });
 
-describe('Cờ Cá Ngựa · xúc xắc và xuất quân', () => {
-  it('nhận diện xúc xắc đặc biệt', () => {
-    expect(isDeployRoll([3, 3])).toBe(true);
-    expect(isDeployRoll([1, 6])).toBe(true);
-    expect(isDeployRoll([6, 1])).toBe(true);
-    expect(isDeployRoll([2, 5])).toBe(false);
+describe('Cờ Cá Ngựa · xuất chuồng', () => {
+  it('chỉ ra 1 hoặc 6 mới xuất chuồng được', () => {
+    expect(DEPLOY_FACES).toEqual([1, 6]);
+    for (const value of [2, 3, 4, 5]) {
+      const state = roll(started(2), value);
+      expect(state.pending).toBeNull();
+      expect(state.players[0].horses.every((horse) => horse.status === 'YARD')).toBe(true);
+      expect(state.currentTurn).toBe(1);
+    }
   });
 
-  it('đôi 6 cho xuất quân cả 4 ngựa và thêm lượt', () => {
-    let state = started(2);
-    state = roll(state, 6, 6);
-    expect(state.pending.moves).toHaveLength(4);
-    expect(state.pending.moves.every((entry) => entry.kind === 'DEPLOY')).toBe(true);
-
-    state = move(state, 0);
-    expect(state.players[0].horses[0].status).toBe('TRACK');
-    expect(state.players[0].horses[0].pos).toBe(0);
+  it('ra 1 thì đưa một ngựa ra ô xuất phát và được tung tiếp', () => {
+    const state = roll(started(2), 1);
+    expect(state.players[0].horses[0]).toMatchObject({ status: 'TRACK', pos: 0 });
+    expect(state.players[0].horses.filter((horse) => horse.status === 'YARD')).toHaveLength(3);
     expect(state.currentTurn).toBe(0);
     expect(state.bonusRolls).toBe(1);
     expect(state.pending).toBeNull();
   });
 
-  it('cặp 1–6 cũng cho xuất quân', () => {
-    let state = started(2);
-    state = roll(state, 1, 6);
-    expect(state.pending.moves).toHaveLength(4);
-    state = move(state, 0);
+  it('ra 6 vừa xuất chuồng vừa được tung tiếp', () => {
+    const state = roll(started(2), 6);
+    expect(state.players[0].horses[0].status).toBe('TRACK');
     expect(state.currentTurn).toBe(0);
     expect(state.bonusRolls).toBe(1);
   });
 
-  it('tổng hoặc từng viên đều là lựa chọn hợp lệ', () => {
+  it('một nước duy nhất thì tự đi luôn, không bắt chọn', () => {
+    const state = roll(started(2), 6);
+    expect(state.pending).toBeNull();
+    expect(state.die).toBe(6);
+  });
+
+  it('nhiều nước thì phải chọn', () => {
     let state = started(2);
     state = setHorses(state, 0, [['TRACK', 0]]);
-    state = roll(state, 2, 3);
-    const options = state.pending.moves
-      .filter((entry) => entry.horseId === state.players[0].horses[0].id)
-      .map((entry) => `${entry.die}:${entry.target.status}:${entry.target.pos}`);
-    expect(options).toEqual(['SUM:TRACK:5', 'D1:TRACK:2', 'D2:TRACK:3']);
+    state = roll(state, 6);
+    expect(state.pending.moves).toHaveLength(2);
+    expect(state.pending.moves.map((entry) => entry.kind)).toEqual(['DEPLOY', 'TRACK']);
+    const next = move(state, 1);
+    expect(next.players[0].horses[0].pos).toBe(6);
+    expect(next.players[0].horses[1].status).toBe('YARD');
   });
 
-  it('không có nước đi thì chuyển lượt', () => {
+  it('xuất chuồng vào ô có địch thì đá quân đó về chuồng', () => {
     let state = started(2);
-    state = roll(state, 2, 3);
-    expect(state.pending).toBeNull();
-    expect(state.currentTurn).toBe(1);
-  });
-
-  it('không có nước đi nhưng tung đôi thì được thêm lượt', () => {
-    let state = started(2);
-    state = setHorses(state, 0, [['HOME', 1], ['HOME', 2], ['HOME', 3], ['HOME', 6]]);
-    state = roll(state, 6, 6);
-    expect(state.pending).toBeNull();
-    expect(state.currentTurn).toBe(0);
-    expect(state.bonusRolls).toBe(1);
-  });
-
-  it('giới hạn số lượt thưởng liên tiếp', () => {
-    let state = started(2);
-    state = setHorses(state, 0, [['HOME', 1], ['HOME', 2], ['HOME', 3], ['HOME', 6]]);
-    state.bonusRolls = MAX_BONUS_ROLLS;
-    state = roll(state, 6, 6);
-    expect(state.currentTurn).toBe(1);
+    // Ô xuất phát của Đỏ là 5; Xanh lá tới đó ở progress 24.
+    state = setHorses(state, 1, [['TRACK', 24]]);
+    state = roll(state, 6);
+    expect(state.players[1].horses[0]).toMatchObject({ status: 'YARD', pos: -1 });
+    expect(state.logs.some((entry) => /đá/.test(entry.text))).toBe(true);
   });
 });
 
 describe('Cờ Cá Ngựa · di chuyển trên đường đua', () => {
-  it('đá toàn bộ quân đối thủ ở ô đích và được thêm lượt', () => {
+  it('đi đúng số vừa tung', () => {
     let state = started(2);
-    state = setHorses(state, 0, [['TRACK', 0]]);
-    // Green starts at 29, so progress 27 lands on absolute cell 8 — the same cell Red reaches with a 3.
-    state = setHorses(state, 1, [['TRACK', 27]]);
-    state = roll(state, 3, 1);
-    const index = findMove(state, state.players[0].horses[0].id, 'D1');
-    expect(index).toBeGreaterThanOrEqual(0);
-    expect(state.pending.moves[index].captures).toHaveLength(1);
-
-    state = move(state, index);
-    expect(state.players[1].horses[0].status).toBe('YARD');
-    expect(state.players[1].horses[0].pos).toBe(-1);
-    expect(state.currentTurn).toBe(0);
-    expect(state.bonusRolls).toBe(1);
+    state = setHorses(state, 0, [['TRACK', 4]]);
+    state = roll(state, 3);
+    expect(state.players[0].horses[0].pos).toBe(7);
+    expect(state.currentTurn).toBe(1);
+    expect(state.bonusRolls).toBe(0);
   });
 
-  it('cho phép xếp quân của mình cùng ô', () => {
+  it('tung được 6 thì đi 6 ô và còn được tung tiếp không giới hạn', () => {
+    let state = started(2);
+    state = setHorses(state, 0, [['TRACK', 4], ['TRACK', 46], ['TRACK', 46], ['TRACK', 46]]);
+    state.bonusRolls = 9;
+    state = roll(state, ROLL_AGAIN_FACE);
+    expect(state.players[0].horses[0].pos).toBe(10);
+    expect(state.currentTurn).toBe(0);
+    expect(state.bonusRolls).toBe(10);
+  });
+
+  it('không được vượt qua ô vào chuồng', () => {
+    let state = started(2);
+    state = setHorses(state, 0, [['TRACK', GATE - 1]]);
+    state = roll(state, 2);
+    expect(state.players[0].horses[0].pos).toBe(GATE - 1);
+    expect(state.currentTurn).toBe(1);
+  });
+
+  it('đá quân đối thủ ở đúng ô đích', () => {
+    let state = started(2);
+    state = setHorses(state, 0, [['TRACK', 10], ['TRACK', 11]]);
+    // Đỏ đi 3 từ progress 10 sẽ tới ô tuyệt đối 18; Xanh lá đứng ở đó với progress 37.
+    state = setHorses(state, 1, [['TRACK', 37]]);
+    state = roll(state, 3);
+    const index = state.pending.moves.findIndex((entry) => entry.captures.length === 1);
+    expect(index).toBeGreaterThanOrEqual(0);
+    state = move(state, index);
+    expect(state.players[1].horses[0]).toMatchObject({ status: 'YARD', pos: -1 });
+    expect(state.players[0].horses[0].pos).toBe(13);
+  });
+
+  it('quân của mình đứng chung ô thì không sao', () => {
     let state = started(2);
     state = setHorses(state, 0, [['TRACK', 0], ['TRACK', 3]]);
-    state = roll(state, 3, 1);
-    const index = findMove(state, state.players[0].horses[0].id, 'D1');
-    expect(index).toBeGreaterThanOrEqual(0);
+    state = roll(state, 3);
+    const index = state.pending.moves.findIndex((entry) => entry.captures.length === 0);
     state = move(state, index);
     expect(state.players[0].horses[0].pos).toBe(3);
     expect(state.players[0].horses[1].pos).toBe(3);
   });
 
-  it('xuất quân vào ô xuất quân có địch cũng đá được', () => {
+  it('quân đang đứng ở ô vào chuồng vẫn bị đá được', () => {
     let state = started(2);
-    // Red's start is absolute 5; Green reaches it at progress 24.
-    state = setHorses(state, 1, [['TRACK', 24]]);
-    state = roll(state, 5, 5);
-    const index = state.pending.moves.findIndex(
-      (entry) => entry.kind === 'DEPLOY' && entry.captures.length === 1
-    );
-    expect(index).toBeGreaterThanOrEqual(0);
-    state = move(state, index);
-    expect(state.players[1].horses[0].status).toBe('YARD');
+    // Đỏ dừng ở cổng (ô tuyệt đối 4); Xanh lá đi 3 ô từ progress 20 sẽ vào đúng ô đó.
+    state = setHorses(state, 0, [['TRACK', GATE]]);
+    state = setHorses(state, 1, [['TRACK', 20]]);
+    state = turn(state, 1);
+    state = roll(state, 3, 'p2');
+    expect(state.players[0].horses[0]).toMatchObject({ status: 'YARD', pos: -1 });
+    expect(state.players[1].horses[0].pos).toBe(23);
+  });
+
+  it('"sát nút" nhận diện quân địch đứng ngay ô trước mặt', () => {
+    const state = started(2);
+    setHorses(state, 0, [['TRACK', 10]]);
+    setHorses(state, 1, [['TRACK', 35]]);
+    expect(isSatNut(state, state.players[0], state.players[0].horses[0])).toBe(true);
+    expect(isSatNut(state, state.players[1], state.players[1].horses[0])).toBe(false);
   });
 
   it('chỉ người đang tới lượt mới được tung và đi', () => {
     const state = started(2);
-    expect(() => roll(state, 2, 3, 'p2')).toThrow('Chưa tới lượt');
+    expect(() => roll(state, 3, 'p2')).toThrow('Chưa tới lượt');
     expect(() => move(state, 0, 'p2')).toThrow('Chưa tới lượt');
   });
 
   it('không thể đi khi chưa tung hoặc chọn nước sai', () => {
     const state = started(2);
     expect(() => move(state, 0)).toThrow('tung xúc xắc');
-    const rolled = roll(state, 6, 6);
+    const rolled = roll(setHorses(state, 0, [['TRACK', 0]]), 6);
     expect(() => move(rolled, 99)).toThrow('không hợp lệ');
   });
 });
 
-describe('Cờ Cá Ngựa · chuồng về đích', () => {
-  it('vượt cửa chuồng sẽ vào đúng bậc theo điểm dư', () => {
-    let state = started(2);
-    state = setHorses(state, 0, [['TRACK', 47]]);
-    state = roll(state, 2, 3);
-    const targets = state.pending.moves.map((entry) => `${entry.die}:${entry.target.status}:${entry.target.pos}`);
-    expect(targets).toEqual(['SUM:HOME:5', 'D1:HOME:2', 'D2:HOME:3']);
+describe('Cờ Cá Ngựa · vào chuồng', () => {
+  it('hàng dọc có 4 ô và vào theo thứ tự 6 – 5 – 4 – 3', () => {
+    expect(HOME_FACES).toEqual([6, 5, 4, 3]);
+    const state = started(2);
+    expect(homeFaceFor(state.players[0])).toBe(6);
+    setHorses(state, 0, [['HOME', 1], ['HOME', 2], ['HOME', 3]]);
+    expect(homeFaceFor(state.players[0])).toBe(3);
   });
 
-  it('đứng ngay trước cửa chuồng đi 2 thì vào bậc 1', () => {
+  it('đứng ở cổng và tung đúng 6 thì vào chuồng bậc 1', () => {
     let state = started(2);
-    state = setHorses(state, 0, [['TRACK', 46]]);
-    state = roll(state, 2, 1);
-    const entry = state.pending.moves.find((candidate) => candidate.die === 'D1');
-    expect(entry.target).toEqual({ status: 'HOME', pos: 1 });
-  });
-
-  it('cho phép nhảy qua ngựa của mình khi đích trống', () => {
-    let state = started(2);
-    state = setHorses(state, 0, [['HOME', 1], ['HOME', 4]]);
-    state = roll(state, 4, 1);
-    const firstHorse = state.players[0].horses[0].id;
-    const index = findMove(state, firstHorse, 'D1');
-    expect(index).toBeGreaterThanOrEqual(0);
-    expect(state.pending.moves[index].target.pos).toBe(5);
-    expect(state.pending.moves[index].captures).toHaveLength(0);
-  });
-
-  it('bậc đã có ngựa của mình thì không vào được', () => {
-    let state = started(2);
-    state = setHorses(state, 0, [['HOME', 1], ['HOME', 2], ['HOME', 3], ['HOME', 6]]);
-    state = roll(state, 6, 6);
-    expect(state.pending).toBeNull();
+    state = setHorses(state, 0, [['TRACK', GATE], ['TRACK', 46], ['TRACK', 46], ['TRACK', 46]]);
+    state = roll(state, 6);
+    expect(state.players[0].horses[0]).toMatchObject({ status: 'HOME', pos: 1 });
     expect(state.currentTurn).toBe(0);
+    expect(state.bonusRolls).toBe(1);
   });
 
-  it('không được vượt quá bậc 6', () => {
-    let state = started(2);
-    state = setHorses(state, 0, [['HOME', 3], ['HOME', 4], ['HOME', 5], ['HOME', 6]]);
-    state = roll(state, 2, 2);
-    expect(state.pending).toBeNull();
+  it('đứng ở cổng mà tung sai số thì mất lượt', () => {
+    for (const value of [2, 3, 4, 5]) {
+      let state = started(2);
+      state = setHorses(state, 0, [['TRACK', GATE], ['TRACK', 46], ['TRACK', 46], ['TRACK', 46]]);
+      state = roll(state, value);
+      expect(state.players[0].horses[0]).toMatchObject({ status: 'TRACK', pos: GATE });
+      expect(state.currentTurn).toBe(1);
+    }
   });
 
-  it('bốn ngựa đúng bậc 3–4–5–6 thì thắng', () => {
+  it('ra 1 cũng không đưa quân đang ở cổng vào chuồng', () => {
+    const state = started(2);
+    setHorses(state, 0, [['TRACK', GATE], ['TRACK', 46], ['TRACK', 46], ['TRACK', 46]]);
+    expect(listMoves(state, state.players[0], 1).some((entry) => entry.target.status === 'HOME')).toBe(false);
+  });
+
+  it('quân thứ hai phải tung đúng 5', () => {
     let state = started(2);
-    state = setHorses(state, 0, [['HOME', 3], ['HOME', 4], ['HOME', 5], ['HOME', 1]]);
-    state = roll(state, 5, 1);
-    const lastHorse = state.players[0].horses[3].id;
-    const index = findMove(state, lastHorse, 'D1');
-    expect(index).toBeGreaterThanOrEqual(0);
-    state = move(state, index);
+    state = setHorses(state, 0, [['HOME', 1], ['TRACK', GATE]]);
+    expect(listMoves(state, state.players[0], 6).some((entry) => entry.target.status === 'HOME')).toBe(false);
+    state = roll(state, 5);
+    expect(state.players[0].horses[1]).toMatchObject({ status: 'HOME', pos: 2 });
+    expect(state.currentTurn).toBe(1);
+  });
+
+  it('đủ 4 ngựa vào chuồng thì thắng ngay', () => {
+    let state = started(2);
+    state = setHorses(state, 0, [['HOME', 1], ['HOME', 2], ['HOME', 3], ['TRACK', GATE]]);
+    state = roll(state, 3);
     expect(state.status).toBe('FINISHED');
     expect(state.winnerId).toBe('p1');
     expect(state.winReason).toBe('ALL_HOME');
-    expect(state.players[0].horses.map((horse) => horse.pos).sort()).toEqual([3, 4, 5, 6]);
+    expect(state.players[0].horses.map((horse) => horse.pos)).toEqual([1, 2, 3, 4]);
   });
 });
 
 describe('Cờ Cá Ngựa · vòng chơi', () => {
   it('bỏ qua người đã rời phòng khi chuyển lượt', () => {
-    let state = started(3, 0);
+    let state = started(3);
     state.players[1].left = true;
-    state = roll(state, 2, 3);
+    state = roll(state, 3);
     expect(state.currentTurn).toBe(2);
   });
 
   it('chủ phòng chỉ được bỏ lượt của người mất kết nối', () => {
-    let state = started(2, 1);
+    let state = started(2);
     state.players[1].connected = false;
+    turn(state, 1);
     expect(() => reduce(state, 'p2', { type: 'SKIP_TURN' })).toThrow(GameError);
-    expect(() => reduce(state, 'p1', { type: 'SKIP_TURN' })).not.toThrow();
     state = reduce(state, 'p1', { type: 'SKIP_TURN' });
     expect(state.currentTurn).toBe(0);
     expect(state.players).toHaveLength(2);
   });
 
   it('không bỏ lượt của người vẫn đang kết nối', () => {
-    const state = started(2, 1);
+    const state = turn(started(2), 1);
     expect(() => reduce(state, 'p1', { type: 'SKIP_TURN' })).toThrow('vẫn đang kết nối');
   });
 
   it('mỗi hành động tăng version để server đồng bộ', () => {
     let state = started(2);
     const before = state.version;
-    state = roll(state, 2, 3);
+    state = roll(state, 3);
     expect(state.version).toBe(before + 1);
-  });
-
-  it('danh sách nước đi không trùng lặp', () => {
-    let state = started(2);
-    state = setHorses(state, 0, [['TRACK', 0]]);
-    state = roll(state, 3, 3);
-    const keys = state.pending.moves.map((entry) => `${entry.horseId}:${entry.target.status}:${entry.target.pos}`);
-    expect(new Set(keys).size).toBe(keys.length);
-    expect(state.pending.moves.filter((entry) => entry.kind === 'DEPLOY')).toHaveLength(3);
   });
 
   it('màu chuồng khớp với ô xuất quân trên bàn cờ', () => {

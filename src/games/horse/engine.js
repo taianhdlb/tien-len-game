@@ -1,9 +1,15 @@
-import { COLORS, COLOR_SETS, TRACK_LENGTH, WIN_STEPS, describeCell, trackIndex } from './board.js';
+import { COLORS, COLOR_SETS, TRACK_LENGTH, describeCell, trackIndex } from './board.js';
 
 export const MAX_PLAYERS = 4;
 export const HORSES_PER_PLAYER = 4;
-export const MAX_BONUS_ROLLS = 3;
 export const MAX_LOGS = 120;
+
+// Cả ván chỉ dùng một viên D6.
+export const DEPLOY_FACES = [1, 6];
+export const ROLL_AGAIN_FACE = 6;
+// Vào chuồng theo thứ tự: quân đầu phải tung đúng 6, rồi 5, 4, 3.
+export const HOME_FACES = [6, 5, 4, 3];
+const GATE_POS = TRACK_LENGTH - 1;
 
 export class GameError extends Error {}
 
@@ -17,10 +23,21 @@ const fail = (message) => {
 export const isActive = (player) => Boolean(player) && !player.left;
 export const activePlayers = (state) => state.players.filter(isActive);
 export const currentPlayer = (state) => state.players[state.currentTurn];
-export const isDeployRoll = (dice = []) =>
-  dice.length === 2 && (dice[0] === dice[1] || (dice[0] === 1 && dice[1] === 6) || (dice[0] === 6 && dice[1] === 1));
-export const isDoubles = (dice = []) => dice.length === 2 && dice[0] === dice[1];
-export const diceSum = (dice = []) => (dice[0] || 0) + (dice[1] || 0);
+export const homeCount = (player) => (player?.horses || []).filter((horse) => horse.status === 'HOME').length;
+export const homeFaceFor = (player) => HOME_FACES[homeCount(player)] ?? null;
+export const canDeploy = (die) => DEPLOY_FACES.includes(die);
+
+/** "Sát nút": có quân đối thủ đứng ngay ô trước mặt — chỉ dùng để hiển thị, không đổi luật. */
+export function isSatNut(state, player, horse) {
+  if (!player?.color || horse?.status !== 'TRACK') return false;
+  const ahead = trackIndex(player.color, (horse.pos + 1) % TRACK_LENGTH);
+  return state.players.some(
+    (other) =>
+      other.id !== player.id &&
+      !other.left &&
+      (other.horses || []).some((entry) => entry.status === 'TRACK' && trackIndex(other.color, entry.pos) === ahead)
+  );
+}
 
 export function createInitialState(id) {
   return {
@@ -32,14 +49,13 @@ export function createInitialState(id) {
     logs: [],
     logSeq: 0,
     currentTurn: 0,
-    dice: null,
+    die: null,
     rollSeq: 0,
     pending: null,
     bonusRolls: 0,
     turnNumber: 1,
     winnerId: null,
-    winReason: null,
-    lastMove: null
+    winReason: null
   };
 }
 
@@ -58,107 +74,62 @@ function rollDie(rng) {
   return 1 + Math.floor(Math.max(0, Math.min(0.999999, rng())) * 6);
 }
 
-function absoluteTrack(player, progress) {
-  return trackIndex(player.color, progress);
-}
-
 function opponentsAt(state, player, target) {
   if (target.status !== 'TRACK') return [];
-  const absolute = absoluteTrack(player, target.pos);
-  const captured = [];
+  const absolute = trackIndex(player.color, target.pos);
+  const hits = [];
   for (const other of state.players) {
     if (other.id === player.id || other.left) continue;
     for (const horse of other.horses || []) {
-      if (horse.status === 'TRACK' && absoluteTrack(other, horse.pos) === absolute) captured.push(horse.id);
+      if (horse.status === 'TRACK' && trackIndex(other.color, horse.pos) === absolute) {
+        hits.push({ playerId: other.id, name: other.name, horseId: horse.id });
+      }
     }
   }
-  return captured;
+  return hits;
 }
 
-function homeOccupied(player, step, ignoredHorseId = null) {
-  return player.horses.some((horse) => horse.id !== ignoredHorseId && horse.status === 'HOME' && horse.pos === step);
+function buildMove(state, player, horse, target, kind, value) {
+  return { horseId: horse.id, kind, value, target, captures: opponentsAt(state, player, target) };
 }
 
-function resolveMove(state, player, horse, value, die) {
-  let target;
-  let kind;
-
-  if (horse.status === 'TRACK') {
-    const next = horse.pos + value;
-    if (next <= TRACK_LENGTH - 1) {
-      target = { status: 'TRACK', pos: next };
-      kind = 'TRACK';
-    } else {
-      const step = next - (TRACK_LENGTH - 1);
-      if (step > 6) return null;
-      if (homeOccupied(player, step, horse.id)) return null;
-      target = { status: 'HOME', pos: step };
-      kind = 'HOME';
-    }
-  } else if (horse.status === 'HOME') {
-    const step = horse.pos + value;
-    if (step > 6) return null;
-    if (homeOccupied(player, step, horse.id)) return null;
-    target = { status: 'HOME', pos: step };
-    kind = 'HOME';
-  } else {
-    return null;
-  }
-
-  return {
-    horseId: horse.id,
-    die,
-    value,
-    kind,
-    target,
-    captures: opponentsAt(state, player, target)
-  };
-}
-
-export function listMoves(state, player, dice) {
-  if (!player || !Array.isArray(dice) || dice.length !== 2) return [];
+/**
+ * Nước đi hợp lệ của một lần tung: ra 1 hoặc 6 thì được xuất chuồng (chỉ một quân, ô đích như nhau),
+ * quân đang đua đi đúng số chấm và không được vượt cổng, quân đứng ở cổng chỉ vào chuồng khi đúng số.
+ */
+export function listMoves(state, player, die) {
+  if (!player || !Number.isInteger(die)) return [];
   const moves = [];
   const seen = new Set();
   const push = (move) => {
-    if (!move) return;
     const key = `${move.horseId}:${move.target.status}:${move.target.pos}`;
     if (seen.has(key)) return;
     seen.add(key);
     moves.push(move);
   };
 
-  if (isDeployRoll(dice)) {
-    for (const horse of player.horses) {
-      if (horse.status !== 'YARD') continue;
-      const target = { status: 'TRACK', pos: 0 };
-      push({
-        horseId: horse.id,
-        die: 'DEPLOY',
-        value: 0,
-        kind: 'DEPLOY',
-        target,
-        captures: opponentsAt(state, player, target)
-      });
-    }
+  if (canDeploy(die)) {
+    const yard = (player.horses || []).find((horse) => horse.status === 'YARD');
+    if (yard) push(buildMove(state, player, yard, { status: 'TRACK', pos: 0 }, 'DEPLOY', 0));
   }
 
-  const options = [
-    ['SUM', dice[0] + dice[1]],
-    ['D1', dice[0]],
-    ['D2', dice[1]]
-  ];
-  for (const [die, value] of options) {
-    for (const horse of player.horses) {
-      if (horse.status === 'YARD') continue;
-      push(resolveMove(state, player, horse, value, die));
+  const home = homeCount(player);
+  const face = HOME_FACES[home] ?? null;
+  for (const horse of player.horses || []) {
+    if (horse.status !== 'TRACK') continue;
+    if (horse.pos === GATE_POS) {
+      if (die === face) push(buildMove(state, player, horse, { status: 'HOME', pos: home + 1 }, 'HOME', die));
+      continue;
     }
+    const next = horse.pos + die;
+    if (next <= GATE_POS) push(buildMove(state, player, horse, { status: 'TRACK', pos: next }, 'TRACK', die));
   }
   return moves;
 }
 
-function grantBonus(state, player) {
+function grantBonus(state, player, reason) {
   state.bonusRolls = (state.bonusRolls || 0) + 1;
-  log(state, `${player.name} được tung thêm xúc xắc (${state.bonusRolls}/${MAX_BONUS_ROLLS}).`, 'gold');
+  log(state, `${player.name} ${reason} nên được tung tiếp.`, 'gold');
 }
 
 function nextActiveIndex(state) {
@@ -179,21 +150,50 @@ function endTurn(state) {
   if (next) log(state, `Lượt của ${next.name} · ${colorLabel(next)}.`, 'muted');
 }
 
-function finish(state, player, reason) {
+function finish(state, player) {
   state.status = 'FINISHED';
   state.pending = null;
   state.winnerId = player.id;
-  state.winReason = reason;
-  log(state, `${player.name} đưa đủ 4 ngựa vào các bậc 3–4–5–6 và giành chiến thắng!`, 'victory');
+  state.winReason = 'ALL_HOME';
+  log(state, `${player.name} đưa đủ 4 ngựa vào chuồng và thắng ván này!`, 'victory');
 }
 
-function checkWin(state, player) {
-  const home = player.horses.filter((horse) => horse.status === 'HOME').map((horse) => horse.pos).sort();
-  if (home.length !== HORSES_PER_PLAYER) return false;
-  return WIN_STEPS.every((step, index) => home[index] === step);
+function applyMove(state, player, move) {
+  const horse = player.horses.find((entry) => entry.id === move.horseId);
+  if (!horse) fail('Không tìm thấy quân cờ.');
+
+  horse.status = move.target.status;
+  horse.pos = move.target.pos;
+  state.pending = null;
+
+  const label = horseLabel(player, horse.id);
+  if (move.kind === 'DEPLOY') log(state, `${player.name} xuất chuồng ${label} ra ô xuất phát.`, 'success');
+  else if (move.kind === 'HOME') log(state, `${player.name} đưa ${label} vào chuồng bậc ${horse.pos}.`, 'success');
+  else log(state, `${player.name} đưa ${label} tới ${describeCell(player.color, move.target)}.`, 'info');
+
+  if (move.captures.length > 0) {
+    for (const other of state.players) {
+      for (const entry of other.horses || []) {
+        if (!move.captures.some((hit) => hit.horseId === entry.id)) continue;
+        entry.status = 'YARD';
+        entry.pos = -1;
+      }
+    }
+    const victims = [...new Set(move.captures.map((hit) => hit.name))].join(', ');
+    log(state, `${player.name} đá ${move.captures.length} quân của ${victims} về chuồng!`, 'danger');
+  }
+
+  if (homeCount(player) === HORSES_PER_PLAYER) {
+    finish(state, player);
+    return;
+  }
+
+  if (move.kind === 'DEPLOY') grantBonus(state, player, 'xuất chuồng');
+  else if (state.die === ROLL_AGAIN_FACE) grantBonus(state, player, `tung được ${ROLL_AGAIN_FACE}`);
+  else endTurn(state);
 }
 
-function start(state, playerId, rng) {
+function start(state, playerId) {
   if (state.status !== 'WAITING') fail('Trận đấu đã bắt đầu.');
   const active = activePlayers(state);
   const host = active[0];
@@ -202,7 +202,7 @@ function start(state, playerId, rng) {
   if (active.length > MAX_PLAYERS) fail('Phòng chỉ hỗ trợ tối đa 4 người chơi.');
 
   const colors = COLOR_SETS[active.length];
-  const players = active.map((entry, index) => ({
+  state.players = active.map((entry, index) => ({
     id: entry.id,
     name: entry.name,
     classId: 'horse',
@@ -216,56 +216,47 @@ function start(state, playerId, rng) {
       slot
     }))
   }));
-
-  state.players = players;
   state.status = 'PLAYING';
-  state.currentTurn = Math.min(players.length - 1, Math.floor(rng() * players.length));
+  state.currentTurn = 0;
   state.turnNumber = 1;
   state.bonusRolls = 0;
-  state.dice = null;
+  state.die = null;
   state.rollSeq = 0;
   state.pending = null;
   state.winnerId = null;
   state.winReason = null;
-  state.lastMove = null;
 
-  log(state, `Trận đua bắt đầu với ${players.length} kỵ sĩ!`, 'victory');
-  log(state, players.map((p) => `${COLORS[p.color].label}: ${p.name}`).join(' · '), 'gold');
-  const first = currentPlayer(state);
-  if (first) log(state, `${first.name} tung xúc xắc trước.`, 'muted');
+  log(state, `Trận đua bắt đầu với ${state.players.length} kỵ sĩ!`, 'victory');
+  log(state, state.players.map((p) => `${COLORS[p.color].label}: ${p.name}`).join(' · '), 'gold');
+  log(state, `${host.name} là chủ phòng nên tung xúc xắc trước.`, 'muted');
 }
 
 function roll(state, playerId, rng) {
   if (state.status !== 'PLAYING') fail('Trận đấu chưa diễn ra.');
   const player = currentPlayer(state);
   if (!player || player.id !== playerId) fail('Chưa tới lượt của bạn!');
-  if (state.pending) fail('Hãy hoàn thành nước đi trước khi tung xúc xắc.');
+  if (state.pending) fail('Hãy chọn nước đi trước khi tung tiếp.');
 
-  const dice = [rollDie(rng), rollDie(rng)];
-  state.dice = dice;
+  const die = rollDie(rng);
+  state.die = die;
   state.rollSeq = (state.rollSeq || 0) + 1;
-  state.lastMove = null;
+  log(state, `${player.name} tung được ${die}.`, canDeploy(die) ? 'gold' : 'info');
 
-  const special = isDeployRoll(dice);
-  log(
-    state,
-    `${player.name} tung được ${dice[0]} + ${dice[1]} = ${dice[0] + dice[1]}${special ? ' · xúc xắc đặc biệt!' : ''}.`,
-    special ? 'gold' : 'info'
-  );
-
-  const moves = listMoves(state, player, dice);
-  if (moves.length === 0) {
-    log(state, `${player.name} không có nước đi hợp lệ.`, 'muted');
-    if (isDoubles(dice) && state.bonusRolls < MAX_BONUS_ROLLS) {
-      grantBonus(state, player);
-    } else {
-      endTurn(state);
-    }
+  const moves = listMoves(state, player, die);
+  // Một nước duy nhất thì đi luôn để người chơi chỉ cần bấm một lần.
+  if (moves.length === 1) {
+    applyMove(state, player, moves[0]);
+    return;
+  }
+  if (moves.length > 1) {
+    state.pending = { kind: 'MOVE', moves };
+    log(state, `Có ${moves.length} nước đi, hãy chọn một quân.`, 'info');
     return;
   }
 
-  state.pending = { kind: 'MOVE', moves };
-  log(state, `${moves.length} nước đi khả dụng.`, 'info');
+  log(state, `${player.name} không đi được nước nào.`, 'muted');
+  if (die === ROLL_AGAIN_FACE) grantBonus(state, player, `tung được ${ROLL_AGAIN_FACE}`);
+  else endTurn(state);
 }
 
 function move(state, playerId, action) {
@@ -277,65 +268,10 @@ function move(state, playerId, action) {
   const { moves } = state.pending;
   let selected = null;
   if (Number.isInteger(action.index)) selected = moves[action.index];
-  else if (action.horseId) {
-    selected = moves.find(
-      (candidate) => candidate.horseId === action.horseId && (!action.die || candidate.die === action.die)
-    );
-  }
+  else if (action.horseId) selected = moves.find((candidate) => candidate.horseId === action.horseId);
   if (!selected) fail('Nước đi không hợp lệ.');
 
-  const horse = player.horses.find((entry) => entry.id === selected.horseId);
-  if (!horse) fail('Không tìm thấy quân cờ.');
-  if (selected.target.status === 'HOME' && homeOccupied(player, selected.target.pos, horse.id)) {
-    fail('Bậc này đã có ngựa của bạn.');
-  }
-
-  const from = { status: horse.status, pos: horse.pos };
-  horse.status = selected.target.status;
-  horse.pos = selected.target.pos;
-
-  state.pending = null;
-  state.lastMove = {
-    seq: (state.lastMove?.seq || 0) + 1,
-    horseId: horse.id,
-    playerId: player.id,
-    from,
-    to: { ...selected.target },
-    captures: [...selected.captures]
-  };
-
-  if (selected.kind === 'DEPLOY') {
-    log(state, `${player.name} xuất quân ${horseLabel(player, horse.id)} tại ô ${absoluteTrack(player, 0) + 1}.`, 'success');
-  } else if (selected.kind === 'HOME') {
-    log(state, `${player.name} đưa ${horseLabel(player, horse.id)} lên bậc ${horse.pos}.`, 'success');
-  } else {
-    log(state, `${player.name} di chuyển ${horseLabel(player, horse.id)} tới ${describeCell(player.color, selected.target)}.`, 'info');
-  }
-
-  if (selected.captures.length > 0) {
-    let fallen = 0;
-    for (const other of state.players) {
-      for (const target of other.horses || []) {
-        if (!selected.captures.includes(target.id)) continue;
-        target.status = 'YARD';
-        target.pos = -1;
-        fallen += 1;
-      }
-    }
-    log(state, `${player.name} đá ${fallen} quân đối thủ về chuồng!`, 'danger');
-  }
-
-  if (checkWin(state, player)) {
-    finish(state, player, 'ALL_HOME');
-    return;
-  }
-
-  const special = isDoubles(state.dice) || selected.kind === 'DEPLOY' || selected.captures.length > 0;
-  if (special && state.bonusRolls < MAX_BONUS_ROLLS) {
-    grantBonus(state, player);
-  } else {
-    endTurn(state);
-  }
+  applyMove(state, player, selected);
 }
 
 function skipTurn(state, playerId) {
@@ -360,7 +296,7 @@ export function reduce(state, playerId, action, rng = Math.random) {
 
   switch (action.type) {
     case 'START':
-      start(next, playerId, rng);
+      start(next, playerId);
       break;
     case 'ROLL':
       roll(next, playerId, rng);

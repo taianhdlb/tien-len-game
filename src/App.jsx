@@ -5,7 +5,7 @@ const HorseGame = lazy(() => import('./games/horse/HorseGame.jsx'));
 const CardGames = lazy(() => import('./games/cards/CardGames.jsx'));
 
 const TABS = [
-  { id: 'MONOPOLY', label: 'Cờ Tỷ Phú D&D', short: 'Monopoly', icon: '🏰' },
+  { id: 'MONOPOLY', label: 'Cờ Tỷ Phú Việt Nam', short: 'Tỷ Phú', icon: '🎡' },
   { id: 'HORSE', label: 'Cờ Cá Ngựa', short: 'Cá Ngựa', icon: '🐴' },
   { id: 'CARDS', label: 'Đánh Bài Online', short: 'Đánh Bài', icon: '🃏' }
 ];
@@ -26,8 +26,8 @@ export default function App() {
     <div className="flex h-dvh flex-col overflow-hidden bg-[#08070a] text-stone-100">
       <header className="z-40 flex shrink-0 items-center gap-2 border-b border-amber-900/50 bg-stone-950/95 px-2 py-1.5 shadow-lg sm:gap-4 sm:px-4 sm:py-2">
         <div className="hidden min-w-0 sm:block">
-          <h1 className="font-display truncate text-lg font-bold text-amber-400 sm:text-xl">Baldur&apos;s Gate</h1>
-          <p className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">Realtime board games</p>
+          <h1 className="font-display truncate text-lg font-bold text-amber-400 sm:text-xl">Bàn Cờ Việt</h1>
+          <p className="text-[10px] font-medium tracking-wider text-stone-500 uppercase">Board game realtime 2–4 người</p>
         </div>
 
         <nav className="flex flex-1 items-center gap-1.5 sm:flex-none" aria-label="Chọn trò chơi">

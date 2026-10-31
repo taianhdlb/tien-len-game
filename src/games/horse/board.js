@@ -12,7 +12,6 @@ function buildTrack() {
 }
 
 export const TRACK = buildTrack();
-export const TRACK_INDEX = new Map(TRACK.map((cell, index) => [`${cell.row}:${cell.col}`, index]));
 
 const lane = (cells) => cells.map(([row, col]) => ({ row, col }));
 
@@ -28,7 +27,7 @@ export const COLORS = {
     start: 5,
     gate: 4,
     yard: { row: 1, col: 1, size: 3 },
-    lane: lane([[1, 4], [2, 4], [3, 4], [4, 4], [5, 4], [6, 4]])
+    lane: lane([[1, 4], [2, 4], [3, 4], [4, 4]])
   },
   BLUE: {
     id: 'BLUE',
@@ -41,7 +40,7 @@ export const COLORS = {
     start: 17,
     gate: 16,
     yard: { row: 1, col: 9, size: 3 },
-    lane: lane([[4, 11], [4, 10], [4, 9], [4, 8], [4, 7], [4, 6]])
+    lane: lane([[4, 11], [4, 10], [4, 9], [4, 8]])
   },
   GREEN: {
     id: 'GREEN',
@@ -54,7 +53,7 @@ export const COLORS = {
     start: 29,
     gate: 28,
     yard: { row: 9, col: 9, size: 3 },
-    lane: lane([[11, 8], [10, 8], [9, 8], [8, 8], [7, 8], [6, 8]])
+    lane: lane([[11, 8], [10, 8], [9, 8], [8, 8]])
   },
   YELLOW: {
     id: 'YELLOW',
@@ -67,7 +66,7 @@ export const COLORS = {
     start: 41,
     gate: 40,
     yard: { row: 9, col: 1, size: 3 },
-    lane: lane([[8, 1], [8, 2], [8, 3], [8, 4], [8, 5], [8, 6]])
+    lane: lane([[8, 1], [8, 2], [8, 3], [8, 4]])
   }
 };
 
@@ -80,7 +79,8 @@ export const COLOR_SETS = {
   4: ['RED', 'BLUE', 'GREEN', 'YELLOW']
 };
 
-export const WIN_STEPS = [3, 4, 5, 6];
+// Hàng dọc màu có đúng 4 ô: 4 ngựa vào lần lượt theo thứ tự tung 6 → 5 → 4 → 3.
+export const HOME_SLOTS = 4;
 
 const YARD_OFFSETS = [
   [0.85, 0.85],
@@ -114,7 +114,7 @@ export function horsePoint(colorId, horse, slot = 0) {
 
 export function describeCell(colorId, target) {
   if (!target) return '';
-  if (target.status === 'HOME') return `bậc ${target.pos}`;
+  if (target.status === 'HOME') return `chuồng bậc ${target.pos}`;
   if (target.status === 'TRACK') {
     const absolute = trackIndex(colorId, target.pos);
     return `ô ${absolute + 1}`;

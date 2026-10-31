@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSocketRoom } from '../../lib/useSocketRoom.js';
+import { useOptimisticDispatch } from '../../lib/useOptimisticDispatch.js';
 import { useToast } from '../../components/toast-context.js';
 import { saveName } from '../../lib/player.js';
 import { countRelics, GameError, reduce } from './engine.js';
@@ -13,13 +14,14 @@ import TileInspector from './TileInspector.jsx';
 import TokenGallery from './TokenGallery.jsx';
 
 const MOBILE_TABS = [
-  { id: 'BOARD', label: 'Bàn cờ', icon: '🏰' },
-  { id: 'PARTY', label: 'Tổ đội', icon: '👥' },
+  { id: 'BOARD', label: 'Bàn cờ', icon: '🎡' },
+  { id: 'PARTY', label: 'Người chơi', icon: '👥' },
   { id: 'LOGS', label: 'Nhật ký', icon: '📜' }
 ];
 
 export default function MonopolyGame() {
-  const { myId, room, setRoom, joined, connected, join, leave, emit } = useSocketRoom('monopoly', 'monopoly:state');
+  const { myId, room, setRoom, joined, connected, join, leave, emit, getServerRoom } =
+    useSocketRoom('monopoly', 'monopoly:state');
   const { notify } = useToast();
   const [inspectedTile, setInspectedTile] = useState(null);
   const [galleryOpen, setGalleryOpen] = useState(false);
@@ -32,22 +34,18 @@ export default function MonopolyGame() {
   const relics = room?.properties ? countRelics(room, myId) : 0;
   const skipTarget = current && current.id !== myId && (current.left || current.connected === false);
 
-  const dispatch = useCallback(
-    (action) => {
-      if (!room) return;
-      let next;
-      try {
-        next = reduce(room, myId, action);
-      } catch (err) {
-        if (err instanceof GameError) notify(err.message, 'error');
-        else console.error(err);
-        return;
-      }
-      setRoom(next);
-      emit('monopoly:submit', { state: next });
-    },
-    [room, myId, notify, emit, setRoom]
-  );
+  // Another player's move can land while our submit is in flight; the shared dispatcher
+  // replays the action on the server snapshot so the roll is never silently lost.
+  const dispatch = useOptimisticDispatch({
+    room,
+    myId,
+    event: 'monopoly:submit',
+    reduce,
+    GameError,
+    setRoom,
+    emit,
+    getServerRoom
+  });
 
   // The host clears stalled turns for players who dropped out so the table never locks up.
   useEffect(() => {
@@ -95,7 +93,7 @@ export default function MonopolyGame() {
   return (
     <div className="flex h-full flex-col overflow-hidden bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-stone-900 via-stone-950 to-black">
       <div className="flex shrink-0 items-center gap-2 border-b border-amber-900/40 bg-stone-950/90 px-2 py-1.5 text-xs sm:px-3">
-        <span className="font-display text-sm text-amber-400 sm:text-base">Baldur&apos;s Gate</span>
+        <span className="font-display text-sm text-amber-400 sm:text-base">Cờ Tỷ Phú Việt Nam</span>
         <button
           type="button"
           onClick={shareRoom}
@@ -105,7 +103,7 @@ export default function MonopolyGame() {
           {room.id}
           <span aria-hidden="true" className="text-[10px] opacity-70">📋</span>
         </button>
-        <span className="hidden text-stone-500 sm:inline">{room.players.filter((p) => !p.left).length}/4 chiến binh</span>
+        <span className="hidden text-stone-500 sm:inline">{room.players.filter((p) => !p.left).length}/4 người chơi</span>
 
         <span className="ml-auto flex items-center gap-2 text-stone-300">
           {me && (
@@ -124,7 +122,7 @@ export default function MonopolyGame() {
           className="rounded-md border border-amber-700/50 bg-stone-900 px-2 py-1 text-[11px] font-bold text-amber-400 transition hover:bg-stone-800"
         >
           <span aria-hidden="true">🏛️</span>
-          <span className="ml-1 hidden sm:inline">Bộ sưu tập 3D</span>
+          <span className="ml-1 hidden sm:inline">Quân cờ 3D</span>
         </button>
         <button
           type="button"

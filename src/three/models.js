@@ -1139,28 +1139,25 @@ export function buildBuildingModel(tier = 0, colorHex = 0xb91c1c) {
 }
 
 export const PIECE_CATALOG = [
-  // RPG Classes
-  { id: 'fighter', name: 'Warrior', category: 'D&D Hero', icon: '⚔️', color: 0xb91c1c, desc: 'Chiến Binh Giáp Trụ & Song Kiếm' },
-  { id: 'rogue', name: 'Rogue', category: 'D&D Hero', icon: '🗡️', color: 0x7e22ce, desc: 'Sát Thủ Bóng Đêm & Song Đoản Đao' },
-  { id: 'wizard', name: 'Wizard', category: 'D&D Hero', icon: '🔮', color: 0x1d4ed8, desc: 'Đại Pháp Sư Nón Phù Thủy & Quả Cầu Mana' },
-  { id: 'cleric', name: 'Cleric', category: 'D&D Hero', icon: '✝️', color: 0xd97706, desc: 'Mục Sư Thánh Quang & Chén Thánh Mặt Trời' },
-  { id: 'paladin', name: 'Paladin', category: 'D&D Hero', icon: '🛡️', color: 0xfacc15, desc: 'Hiệp Sĩ Thánh Khiên Pháo Đài Hoàng Gia' },
-  { id: 'barbarian', name: 'Barbarian', category: 'D&D Hero', icon: '🪓', color: 0xc2410c, desc: 'Chiến Tướng Cuồng Nộ Rìu Song Lưỡi' },
-  { id: 'ranger', name: 'Ranger', category: 'D&D Hero', icon: '🏹', color: 0x047857, desc: 'Thiện Xạ Rừng Sâu Cung & Ống Tên' },
-  { id: 'druid', name: 'Druid', category: 'D&D Hero', icon: '🌿', color: 0x15803d, desc: 'Hiền Triết Thiên Nhiên Sừng Hươu & Ngọc Lục Bảo' },
-  { id: 'warlock', name: 'Warlock', category: 'D&D Hero', icon: '👁️', color: 0x4338ca, desc: 'Thuật Sĩ Hư Không Mắt Quỷ & Sách Ma Đạo' },
-  { id: 'sorcerer', name: 'Sorcerer', category: 'D&D Hero', icon: '⚡', color: 0x0891b2, desc: 'Phù Thủy Long Tộc Tháp Tinh Thể Sấm Sét' },
-  { id: 'horse', name: 'Chiến Mã', category: 'Cờ Cá Ngựa', icon: '🐴', color: 0xef4444, desc: 'Chiến mã bờm vàng, yên cương lụa là' },
-  // Classic Chess
-  { id: 'pawn', name: 'Tốt (Pawn)', category: 'Cờ Vua', icon: '♟️', color: 0xe2e8f0, desc: 'Quân Tốt Cờ Vua Gỗ Tiện Hoàng Gia' },
-  { id: 'knight', name: 'Mã (Knight)', category: 'Cờ Vua', icon: '♞', color: 0xe2e8f0, desc: 'Chiến Mã Tinh Xảo Với Bờm & Dây Cương' },
-  { id: 'rook', name: 'Xe (Rook)', category: 'Cờ Vua', icon: '♜', color: 0xe2e8f0, desc: 'Pháo Đài Kiên Cố Lỗ Châu Mai' },
-  { id: 'bishop', name: 'Tượng (Bishop)', category: 'Cờ Vua', icon: '♝', color: 0xe2e8f0, desc: 'Giáo Hoàng Mũ Giám Mục & Thánh Điểm' },
-  { id: 'queen', name: 'Hậu (Queen)', category: 'Cờ Vua', icon: '♛', color: 0xe2e8f0, desc: 'Nữ Hoàng Vương Miện Tinh Thể Hồng Ngọc' },
-  { id: 'king', name: 'Vua (King)', category: 'Cờ Vua', icon: '♚', color: 0xe2e8f0, desc: 'Đức Vua Vương Miện Thánh Giá Latin' },
-  // Classic Monopoly
-  { id: 'tophat', name: 'Nón Quý Tộc', category: 'Monopoly', icon: '🎩', color: 0x334155, desc: 'Mũ Ảo Thuật Quý Tộc Victoria Cổ Điển' },
-  { id: 'car', name: 'Xe Đua Cổ', category: 'Monopoly', icon: '🚗', color: 0xb91c1c, desc: 'Chiếc Xe Thể Thao Vintage 4 Bánh Răng Cưa' },
-  { id: 'battleship', name: 'Chiến Hạm', category: 'Monopoly', icon: '🚢', color: 0x64748b, desc: 'Thiết Giáp Hạm Hải Quân Đại Bác Đôi' },
-  { id: 'thimble', name: 'Ống Chỉ Bạc', category: 'Monopoly', icon: '🧵', color: 0x94a3b8, desc: 'Ống Chỉ Kim Loại Khảm Hoa Văn Cổ' }
+  { id: 'fighter', name: 'Kiếm Sĩ', category: 'Cờ Tỷ Phú', icon: '⚔️', color: 0xb91c1c },
+  { id: 'rogue', name: 'Đạo Tặc', category: 'Cờ Tỷ Phú', icon: '🗡️', color: 0x7e22ce },
+  { id: 'wizard', name: 'Pháp Sư', category: 'Cờ Tỷ Phú', icon: '🔮', color: 0x1d4ed8 },
+  { id: 'cleric', name: 'Thầy Cúng', category: 'Cờ Tỷ Phú', icon: '✝️', color: 0xd97706 },
+  { id: 'paladin', name: 'Hiệp Sĩ', category: 'Cờ Tỷ Phú', icon: '🛡️', color: 0xfacc15 },
+  { id: 'barbarian', name: 'Cuồng Sĩ', category: 'Cờ Tỷ Phú', icon: '🪓', color: 0xc2410c },
+  { id: 'ranger', name: 'Xạ Thủ', category: 'Cờ Tỷ Phú', icon: '🏹', color: 0x047857 },
+  { id: 'druid', name: 'Thầy Thuốc', category: 'Cờ Tỷ Phú', icon: '🌿', color: 0x15803d },
+  { id: 'warlock', name: 'Thầy Bói', category: 'Cờ Tỷ Phú', icon: '👁️', color: 0x4338ca },
+  { id: 'sorcerer', name: 'Long Tộc', category: 'Cờ Tỷ Phú', icon: '⚡', color: 0x0891b2 },
+  { id: 'horse', name: 'Chiến Mã', category: 'Cờ Cá Ngựa', icon: '🐴', color: 0xef4444 },
+  { id: 'pawn', name: 'Tốt (Pawn)', category: 'Cờ Vua', icon: '♟️', color: 0xe2e8f0 },
+  { id: 'knight', name: 'Mã (Knight)', category: 'Cờ Vua', icon: '♞', color: 0xe2e8f0 },
+  { id: 'rook', name: 'Xe (Rook)', category: 'Cờ Vua', icon: '♜', color: 0xe2e8f0 },
+  { id: 'bishop', name: 'Tượng (Bishop)', category: 'Cờ Vua', icon: '♝', color: 0xe2e8f0 },
+  { id: 'queen', name: 'Hậu (Queen)', category: 'Cờ Vua', icon: '♛', color: 0xe2e8f0 },
+  { id: 'king', name: 'Vua (King)', category: 'Cờ Vua', icon: '♚', color: 0xe2e8f0 },
+  { id: 'tophat', name: 'Nón Quý Tộc', category: 'Cờ Tỷ Phú', icon: '🎩', color: 0x334155 },
+  { id: 'car', name: 'Xe Đua Cổ', category: 'Cờ Tỷ Phú', icon: '🚗', color: 0xb91c1c },
+  { id: 'battleship', name: 'Chiến Hạm', category: 'Cờ Tỷ Phú', icon: '🚢', color: 0x64748b },
+  { id: 'thimble', name: 'Ống Chỉ Bạc', category: 'Cờ Tỷ Phú', icon: '🧵', color: 0x94a3b8 }
 ];

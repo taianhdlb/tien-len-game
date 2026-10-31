@@ -41,7 +41,7 @@ export default function HorseLobby({ connected, onJoin }) {
               Cờ Cá Ngựa
             </h1>
             <p className="mt-1 text-[11px] text-stone-400 sm:text-xs">
-              Bàn cờ 48 ô · 4 chú ngựa · 2 viên xúc xắc · 2–4 kỵ sĩ realtime
+              Bàn cờ 48 ô · 4 chú ngựa · 1 viên xúc xắc D6 · 2–4 kỵ sĩ realtime
             </p>
           </div>
           <button
@@ -62,7 +62,7 @@ export default function HorseLobby({ connected, onJoin }) {
               <span aria-hidden="true">🐴</span> Chiến mã bờm vàng
             </p>
             <p className="mt-0.5 text-xs leading-snug text-stone-400">
-              Mỗi kỵ sĩ nhận 4 chú ngựa cùng màu. Đưa đủ 4 ngựa lên bậc 3–4–5–6 để ca khúc khải hoàn.
+              Mỗi kỵ sĩ nhận 4 chú ngựa cùng màu. Đưa đủ 4 ngựa vào chuồng theo thứ tự 6 – 5 – 4 – 3 để chiến thắng.
             </p>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {COLOR_ORDER.map((id) => (

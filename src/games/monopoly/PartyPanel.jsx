@@ -8,7 +8,7 @@ export default function PartyPanel({ room, myId }) {
   return (
     <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-stone-800 bg-stone-950/80">
       <header className="flex shrink-0 items-center justify-between border-b border-stone-800 px-3 py-2">
-        <h2 className="text-xs font-black tracking-[0.18em] text-stone-300 uppercase">Tổ đội</h2>
+        <h2 className="text-xs font-black tracking-[0.18em] text-stone-300 uppercase">Người chơi</h2>
         <span className="rounded-full bg-stone-900 px-2 py-0.5 text-[10px] font-bold text-stone-400">
           {room.players.filter((p) => !p.left).length}/4
         </span>
@@ -46,7 +46,7 @@ export default function PartyPanel({ room, myId }) {
                   <span className="truncate">{p.name}</span>
                   {p.id === myId && <span className="shrink-0 text-[10px] font-black text-emerald-400">(Bạn)</span>}
                   {p.id === host?.id && <span title="Chủ phòng" aria-hidden="true" className="shrink-0 text-[11px]">👑</span>}
-                  {p.inJail && <span title="Đang ở trong ngục" aria-hidden="true" className="shrink-0 text-[11px]">⛓️</span>}
+                  {p.inJail && <span title="Đang bị tạm giam" aria-hidden="true" className="shrink-0 text-[11px]">⛓️</span>}
                   {p.connected === false && !p.left && (
                     <span className="shrink-0 rounded bg-rose-950 px-1 text-[8px] font-black text-rose-300">MẤT KẾT NỐI</span>
                   )}
@@ -56,7 +56,7 @@ export default function PartyPanel({ room, myId }) {
                 </p>
                 <p className="flex items-center justify-between gap-2 text-[10px] text-stone-500">
                   <span className="truncate">
-                    {cls.icon} {cls.name} · {tile?.name || 'Khởi hành'}
+                    {cls.icon} {cls.name} · {tile?.name || 'Xuất Phát'}
                   </span>
                   <span className="flex shrink-0 items-center gap-1.5 font-bold">
                     <span className="text-amber-300">{p.gold ?? 0}g</span>
